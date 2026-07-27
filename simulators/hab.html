@@ -1,0 +1,3999 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAB RF Link Budget Dashboard</title>
+    <!-- Leaflet.js CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        :root {
+            --bg-base: #f8fafc;
+            --bg-card: #ffffff;
+            --bg-sidebar: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --border-color: #cbd5e1;
+            --border-light: #e2e8f0;
+            --accent-blue: #2563eb;
+            --success-color: #15803d;
+            --fail-color: #b45309;
+            --danger-color: #b91c1c;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Layout Container */
+        .app-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            flex: 1;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                height: auto;
+                overflow: auto;
+            }
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-light);
+            padding: 1.25rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .sidebar-section {
+            border: 1px solid var(--border-light);
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .sidebar-title {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 0.4rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: color 0.15s;
+        }
+
+        .sidebar-title:hover {
+            color: var(--accent-blue);
+        }
+
+        .sidebar-section.collapsed .sidebar-title {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .sidebar-section .section-content {
+            margin-top: 0.85rem;
+            display: block;
+        }
+
+        .sidebar-section.collapsed .section-content {
+            display: none;
+        }
+
+        .sidebar-title-static {
+            margin: 0 0 0.85rem 0;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 0.4rem;
+        }
+
+        .form-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        input,
+        select {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.4rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: inherit;
+            transition: border-color 0.15s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .btn {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.45rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: background-color 0.15s, border-color 0.15s;
+        }
+
+        .btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+
+        .btn-danger {
+            background: #ffffff;
+            border-color: #fca5a5;
+            color: var(--danger-color);
+        }
+
+        .btn-danger:hover {
+            background: #fee2e2;
+            border-color: #f87171;
+        }
+
+        .btn-danger:disabled {
+            background: #f8fafc;
+            border-color: var(--border-light);
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        /* Profile management */
+        .profile-actions-inline {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .profile-add-container {
+            display: flex;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+            border-top: 1px solid var(--border-light);
+            padding-top: 0.75rem;
+        }
+
+        /* Main Content Panel */
+        .main-content {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            gap: 1rem;
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                height: auto;
+                overflow: visible;
+            }
+        }
+
+        /* Global info banner */
+        .summary-banner {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .summary-stat-val {
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .metric-card {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-left: 4px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            cursor: pointer;
+            transition: border-color 0.15s, transform 0.1s;
+        }
+
+        .metric-card:hover {
+            border-color: #94a3b8;
+            transform: translateY(-1px);
+        }
+
+        .metric-card.active {
+            background: #f8fafc;
+            border-color: var(--accent-blue);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .card-status-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+        }
+
+        .badge-lock {
+            background: #dcfce7;
+            color: var(--success-color);
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-fail {
+            background: #ffedd5;
+            color: var(--fail-color);
+            border: 1px solid #fed7aa;
+        }
+
+        .badge-blocked {
+            background: #fee2e2;
+            color: var(--danger-color);
+            border: 1px solid #fca5a5;
+        }
+
+        .card-metrics {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .card-metric-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .card-snr {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-light);
+            padding-top: 0.4rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Visualization Tabs */
+        .visual-tabs {
+            display: flex;
+            gap: 0.25rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            border-radius: 6px 6px 0 0;
+            transition: color 0.15s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-blue);
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-bottom-color: #ffffff;
+            margin-bottom: -1px;
+        }
+
+        .visual-display-container {
+            flex: 1;
+            position: relative;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+            min-height: 480px;
+        }
+
+        @media (max-width: 1024px) {
+            .visual-display-container {
+                min-height: 400px;
+            }
+        }
+
+        .view-panel {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        #map-view {
+            background: #f1f5f9;
+        }
+
+        #profile-view {
+            background: #ffffff;
+            position: relative;
+        }
+
+        #profile-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Interactive handles overlay styling */
+        .canvas-instructions {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid var(--border-light);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            pointer-events: none;
+            max-width: 280px;
+            line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+            transition: opacity 0.25s;
+        }
+
+        .canvas-controls {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 10;
+            display: flex;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+
+            <!-- Balloon Location & Altitude -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Balloon Location</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="g_lat">Balloon Lat</label>
+                            <input type="number" id="g_lat" step="0.0001" min="-90" max="90">
+                        </div>
+                        <div class="form-group">
+                            <label for="g_lon">Balloon Lon</label>
+                            <input type="number" id="g_lon" step="0.0001" min="-180" max="180">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="g_alt_km">Balloon Alt (km ASL)</label>
+                        <input type="number" id="g_alt_km" step="0.5" min="0">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Receivers Manager -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Receivers Manager</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label for="receiver-select">Active Receiver</label>
+                        <select id="receiver-select"></select>
+                    </div>
+                    <div class="profile-actions-inline">
+                        <button class="btn btn-danger" id="btn-delete-receiver" onclick="deleteActiveReceiver()"
+                            style="width: 100%; justify-content: center; margin-bottom: 0.75rem;">
+                            Delete Active
+                        </button>
+                    </div>
+                    <div class="profile-add-container"
+                        style="margin-top: 0; padding-top: 0; border-top: none; margin-bottom: 0.75rem;">
+                        <input type="text" id="new-receiver-name" placeholder="New Receiver Name" style="flex: 1;">
+                        <button class="btn btn-primary" onclick="addNewReceiver()">Add</button>
+                    </div>
+                    <div
+                        style="border-top: 1px solid var(--border-light); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="g_target_lat">Receiver Lat</label>
+                                <input type="number" id="g_target_lat" step="0.0001" min="-90" max="90">
+                            </div>
+                            <div class="form-group">
+                                <label for="g_target_lon">Receiver Lon</label>
+                                <input type="number" id="g_target_lon" step="0.0001" min="-180" max="180">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="g_rx_alt_m">Receiver Alt (m ASL)</label>
+                            <div style="display: flex; gap: 0.4rem;">
+                                <input type="number" id="g_rx_alt_m" step="1" min="-400" max="9000" style="flex: 1;">
+                                <button class="btn btn-primary" id="btn-fetch-rx-alt" onclick="fetchReceiverElevation()"
+                                    style="padding: 0.4rem; font-size: 0.75rem;" title="Fetch Altimetry from API">Get
+                                    Alt</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Manager -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Profile Manager</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label for="profile-select">Active Profile</label>
+                        <select id="profile-select"></select>
+                    </div>
+                    <div class="profile-actions-inline" style="flex-wrap: wrap; gap: 0.4rem;">
+                        <button class="btn btn-danger" id="btn-delete-profile" onclick="deleteActiveProfile()"
+                            style="flex: 1; justify-content: center;">
+                            Delete Active
+                        </button>
+                        <button class="btn" id="btn-toggle-profile-visibility" onclick="toggleActiveProfileVisibility()"
+                            style="flex: 1; justify-content: center;">
+                            Hide
+                        </button>
+                    </div>
+
+                    <div class="profile-add-container">
+                        <input type="text" id="new-profile-name" placeholder="New Profile Name" style="flex: 1;">
+                        <button class="btn btn-primary" onclick="addNewProfile()">Add</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Active Profile Parameters -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Link Settings</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_f_mhz">Freq (MHz)</label>
+                            <input type="number" id="p_f_mhz" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_p_tx">Tx Power (dBm)</label>
+                            <input type="number" id="p_p_tx" step="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_g_tx">Tx Ant (dBi)</label>
+                            <input type="number" id="p_g_tx" step="0.5">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_g_rx">Rx Ant (dBi)</label>
+                            <input type="number" id="p_g_rx" step="0.5">
+                        </div>
+                    </div>
+                    <div class="form-row" style="align-items: center; margin-bottom: 0.5rem;">
+                        <div class="form-group"
+                            style="display: flex; align-items: center; gap: 0.4rem; grid-column: span 2; margin-bottom: 0;">
+                            <input type="checkbox" id="p_show_footprint"
+                                style="width: auto; margin: 0; cursor: pointer;">
+                            <label for="p_show_footprint"
+                                style="margin-bottom: 0; cursor: pointer; user-select: none;">Show
+                                TX Beam Footprint</label>
+                        </div>
+                    </div>
+                    <div id="hpbw-input-container"
+                        style="display: none; border-left: 2px solid var(--border-color); padding-left: 0.5rem; margin-bottom: 0.75rem;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="p_tx_hpbw">HPBW (deg)</label>
+                                <input type="number" id="p_tx_hpbw" step="1" min="1" max="179" value="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="p_tx_fnbw">FNBW (deg)</label>
+                                <input type="number" id="p_tx_fnbw" step="1" min="1" max="179" value="120">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                            <label
+                                style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.1rem;">Visible
+                                Rings</label>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <input type="checkbox" id="p_show_hpbw_ring"
+                                    style="width: auto; margin: 0; cursor: pointer;">
+                                <label for="p_show_hpbw_ring"
+                                    style="margin-bottom: 0; cursor: pointer; font-size: 0.75rem; user-select: none;">HPBW
+                                    (-3 dB)</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <input type="checkbox" id="p_show_zero_dbi_ring"
+                                    style="width: auto; margin: 0; cursor: pointer;">
+                                <label for="p_show_zero_dbi_ring"
+                                    style="margin-bottom: 0; cursor: pointer; font-size: 0.75rem; user-select: none;">0
+                                    dBi
+                                    Gain boundary</label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <input type="checkbox" id="p_show_fnbw_ring"
+                                    style="width: auto; margin: 0; cursor: pointer;">
+                                <label for="p_show_fnbw_ring"
+                                    style="margin-bottom: 0; cursor: pointer; font-size: 0.75rem; user-select: none;">First
+                                    Null (FNBW)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_rx_loss">Rx Loss (dB)</label>
+                            <input type="number" id="p_rx_loss" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_rtl_nf">SDR NF (dB)</label>
+                            <input type="number" id="p_rtl_nf" step="0.1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_sym_rate">Sym Rate (kS/s)</label>
+                            <input type="number" id="p_sym_rate" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_modulation">Modulation</label>
+                            <select id="p_modulation">
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_coding">Coding</label>
+                            <select id="p_coding">
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="p_impl_loss">Impl Loss (dB)</label>
+                            <input type="number" id="p_impl_loss" step="0.1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_target_type">Eb/N0 Target Limit</label>
+                            <select id="p_target_type">
+                                <option value="BER">BER</option>
+                                <option value="FER">FER</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="p_target_value">Target Value</label>
+                            <div style="display: flex; gap: 0.4rem;">
+                                <select id="p_target_value_preset" style="flex: 1;">
+                                    <option value="1e-1">1e-1</option>
+                                    <option value="1e-2">1e-2</option>
+                                    <option value="1e-3">1e-3</option>
+                                    <option value="1e-4">1e-4</option>
+                                    <option value="1e-5" selected>1e-5</option>
+                                    <option value="1e-6">1e-6</option>
+                                    <option value="1e-7">1e-7</option>
+                                    <option value="1e-8">1e-8</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input type="text" id="p_target_value" style="flex: 1;" value="1e-5">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="p_rrc_alpha">RRC Alpha</label>
+                            <input type="number" id="p_rrc_alpha" step="0.05" min="0" max="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_phase_jitter">Phase Jitter (dB)</label>
+                            <input type="number" id="p_phase_jitter" step="0.05">
+                        </div>
+                    </div>
+
+                    <!-- Smart Link Optimizer -->
+                    <div style="border-top: 1px solid var(--border-light); margin-top: 0.75rem; padding-top: 0.75rem;">
+                        <label
+                            style="font-weight: bold; color: var(--accent-blue); font-size: 0.75rem; display: flex; align-items: center; gap: 4px; margin-bottom: 0.4rem;">
+                            Smart Link Optimizer
+                        </label>
+                        <div class="form-row">
+                            <div class="form-group" style="margin-bottom: 0.4rem;">
+                                <label for="opt_max_sym_rate">Max Sym Rate (kS/s)</label>
+                                <input type="number" id="opt_max_sym_rate" value="1000" min="1" step="10"
+                                    style="padding: 0.35rem 0.5rem; font-size: 0.75rem;">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.4rem;">
+                                <label for="opt_max_mod">Max Modulation</label>
+                                <select id="opt_max_mod"
+                                    style="padding: 0.35rem 0.5rem; font-size: 0.75rem; height: 26px; width: 100%; box-sizing: border-box;">
+                                    <option value="any" selected>Any</option>
+                                    <option value="BPSK">BPSK</option>
+                                    <option value="QPSK">QPSK</option>
+                                    <option value="8PSK">8PSK</option>
+                                    <option value="16QAM">16QAM / 16APSK</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.5rem;">
+                            <button class="btn btn-primary" onclick="runSmartOptimization()"
+                                style="width: 100%; height: 30px; justify-content: center; font-size: 0.75rem; white-space: nowrap;">
+                                Optimize Link
+                            </button>
+                        </div>
+                        <div id="opt-result"
+                            style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.3;">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Simulation Data Source -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Simulation Data Source</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div id="csv-status" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                        Loading CSV data...
+                    </div>
+                    <div id="csv-upload-container" style="display: none;">
+                        <label style="font-size: 0.7rem;">Upload ber.csv and fer.csv to run locally:</label>
+                        <input type="file" id="csv-files-input" multiple accept=".csv"
+                            style="font-size: 0.75rem; margin-top: 0.25rem;">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Link Summary -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title" onclick="toggleSection(this)">
+                    <span>Link Summary</span>
+                    <span class="collapse-icon">▼</span>
+                </h2>
+                <div class="section-content">
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Distance:</span>
+                            <span id="lbl-summary-distance" class="summary-stat-val"
+                                style="font-weight: 600; color: var(--accent-blue);">-- km</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Elevation:</span>
+                            <span id="lbl-summary-elevation" class="summary-stat-val"
+                                style="font-weight: 600; color: var(--accent-blue);">--°</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Heading:</span>
+                            <span id="lbl-summary-heading" class="summary-stat-val"
+                                style="font-weight: 600; color: var(--accent-blue);">--°</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-muted); font-weight: 500;">Horizon:</span>
+                            <span id="lbl-summary-horizon" class="summary-stat-val"
+                                style="font-weight: 600; color: var(--accent-blue);">-- km</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Global Config Buttons -->
+            <section class="sidebar-section">
+                <h2 class="sidebar-title-static">Global Controls</h2>
+                <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+                    <div style="display: flex; gap: 0.4rem;">
+                        <button class="btn" onclick="exportJSON()" style="flex: 1; justify-content: center;">Export
+                            JSON</button>
+                        <button class="btn" onclick="document.getElementById('file-import').click()"
+                            style="flex: 1; justify-content: center;">Import JSON</button>
+                    </div>
+                    <button class="btn" onclick="exportMapPNG()" id="btn-export-map-png"
+                        style="width: 100%; justify-content: center;"
+                        title="Save a PNG snapshot of the coverage map with legend">
+                        📷 Export Map PNG
+                    </button>
+                    <button class="btn btn-danger" onclick="resetToDefaults()"
+                        style="width: 100%; justify-content: center;">Reset Defaults</button>
+                    <input type="file" id="file-import" accept=".json" style="display:none"
+                        onchange="importJSON(event)">
+                </div>
+            </section>
+
+        </aside>
+
+        <!-- Main Display Content -->
+        <main class="main-content">
+
+            <!-- Dynamic Metrics Grid -->
+            <div class="metrics-grid" id="metrics-grid"></div>
+
+            <!-- Tabs selector for map or canvas profile -->
+            <div class="visual-tabs">
+                <button class="tab-btn active" onclick="switchVisualTab('map')" id="tab-btn-map">Interactive
+                    Map</button>
+                <button class="tab-btn" onclick="switchVisualTab('profile')" id="tab-btn-profile">Profile
+                    Diagram</button>
+            </div>
+
+            <!-- Screen Viewport Wrapper -->
+            <div class="visual-display-container">
+
+                <!-- Map View -->
+                <div id="map-view" class="view-panel active">
+                    <div id="map" style="width: 100%; height: 100%;"></div>
+                </div>
+
+                <!-- Curvature View -->
+                <div id="profile-view" class="view-panel">
+                    <canvas id="profile-canvas"></canvas>
+
+                    <!-- Instructions Overlay -->
+                    <div class="canvas-instructions">
+                        <div
+                            style="font-weight: 600; color: var(--text-main); margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                            <span>🎯</span> Profile Interaction
+                        </div>
+                        • Drag <span style="color: #dc2626; font-weight: 600;">Red Dot</span> vertically to set
+                        Altitude<br>
+                        • Drag <span style="color: #2563eb; font-weight: 600;">Blue Dot</span> horizontally to set
+                        Distance<br>
+                        • Drag background to pan view<br>
+                        • Scroll mouse wheel or pinch to zoom
+                    </div>
+
+                    <!-- Toolbar Overlay -->
+                    <div class="canvas-controls">
+                        <button class="btn" onclick="zoomCanvas(1.2)" title="Zoom In"
+                            style="padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.9rem; margin: 0;">+</button>
+                        <button class="btn" onclick="zoomCanvas(1/1.2)" title="Zoom Out"
+                            style="padding: 0.3rem 0.6rem; font-weight: bold; font-size: 0.9rem; margin: 0;">−</button>
+                        <button class="btn btn-primary" onclick="autoFitCanvas()" title="Fit Diagram to Screen"
+                            style="font-size: 0.75rem; padding: 0.3rem 0.6rem; margin: 0;">Fit View</button>
+                    </div>
+                </div>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script>
+        // --- Core Math Constants ---
+        const EARTH_RADIUS_KM = 6371.0;
+        const CCSDS_EB_N0 = { "1/2": 2.6, "2/3": 3.5, "3/4": 4.1, "5/6": 4.8, "7/8": 5.4 };
+        const PUNCTURE_MULTIPLIER = { "1/2": 0.5, "2/3": 2.0 / 3.0, "3/4": 0.75, "5/6": 5.0 / 6.0, "7/8": 0.875 };
+
+        // Simple clean colors to cycle through for link configurations
+        const LINK_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#7c3aed", "#db2777", "#0891b2", "#dc2626"];
+
+        // --- App Default Configurations ---
+        const defaultState = {
+            global_state: {
+                lat: 52.51,
+                lon: 21.02,
+                alt_km: 35.0,
+                receivers: [
+                    { id: "rx_1", name: "Ground Station 1", lat: 52.23, lon: 21.01, alt_m: 110.0 }
+                ],
+                active_receiver_id: "rx_1"
+            },
+            profiles: {
+                "UHF High-Speed": {
+                    f_mhz: 435.0, p_tx: 26.0, g_tx: 0.0, g_rx: 5.0, rx_loss: 3.0,
+                    sym_rate: 100.0, rrc_alpha: 0.25, rtl_nf: 2.0, phase_jitter: 0.0,
+                    coding: "Concat 1/2 D4", modulation: "QPSK", target_type: "BER", target_value: 1e-5, impl_loss: 1.5,
+                    show_footprint: false, tx_hpbw: 60, tx_fnbw: 120,
+                    show_hpbw_ring: true, show_zero_dbi_ring: true, show_fnbw_ring: true
+                },
+                "VHF Telemetry": {
+                    f_mhz: 145.0, p_tx: 20.0, g_tx: 0.0, g_rx: 3.0, rx_loss: 1.5,
+                    sym_rate: 20.0, rrc_alpha: 0.50, rtl_nf: 3.0, phase_jitter: 0.0,
+                    coding: "Concat 1/2 D4", modulation: "QPSK", target_type: "BER", target_value: 1e-5, impl_loss: 1.0,
+                    show_footprint: false, tx_hpbw: 60, tx_fnbw: 120,
+                    show_hpbw_ring: true, show_zero_dbi_ring: true, show_fnbw_ring: true
+                }
+            },
+            active_profile_name: "UHF High-Speed"
+        };
+
+        // --- CSV Parsing and Eb/N0 Required Lookup ---
+        let berData = null;
+        let ferData = null;
+        let codingToModulations = {};
+        let allCodings = [];
+
+        const DEFAULT_CODINGS = ["Concat 1/2 D4", "Concat 2/3 D4", "Concat 3/4 D4", "RS Depth 4", "Uncoded"];
+        const DEFAULT_MODULATIONS = ["BPSK", "QPSK", "8PSK", "16APSK", "16QAM"];
+
+        function parseCSV(text) {
+            const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            if (lines.length === 0) return { headers: [], data: [] };
+            const headers = lines[0].split(',').map(h => h.trim());
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                const row = {};
+                for (let j = 0; j < headers.length; j++) {
+                    row[headers[j]] = cols[j] !== undefined ? cols[j] : "";
+                }
+                data.push(row);
+            }
+            return { headers, data };
+        }
+
+        function getCSVColumnName(coding, modulation) {
+            let targetMod = modulation;
+            if (modulation === 'QPSK') targetMod = 'BPSK';
+            return `${coding} (${targetMod})`;
+        }
+
+        function getRequiredEbN0(csvData, columnName, targetValue) {
+            let prevEbN0 = null;
+            let prevVal = null;
+            for (let i = 0; i < csvData.length; i++) {
+                const row = csvData[i];
+                const ebN0 = parseFloat(row['Eb/No (dB)']);
+                const valStr = row[columnName];
+                if (valStr === undefined || valStr === "") continue;
+                const val = parseFloat(valStr);
+                if (isNaN(ebN0) || isNaN(val)) continue;
+
+                if (val <= targetValue) {
+                    if (prevVal === null) return ebN0;
+                    if (prevVal === val) return ebN0;
+
+                    const safePrev = prevVal === 0 ? 1e-12 : prevVal;
+                    const safeVal = val === 0 ? 1e-12 : val;
+                    if (safePrev > 0 && safeVal > 0) {
+                        const logPrev = Math.log10(safePrev);
+                        const logVal = Math.log10(safeVal);
+                        const logTarget = Math.log10(targetValue);
+                        if (logVal !== logPrev) {
+                            const t = (logTarget - logPrev) / (logVal - logPrev);
+                            return prevEbN0 + t * (ebN0 - prevEbN0);
+                        }
+                    }
+                    if (val !== prevVal) {
+                        const t = (targetValue - prevVal) / (val - prevVal);
+                        return prevEbN0 + t * (ebN0 - prevEbN0);
+                    }
+                    return ebN0;
+                }
+                prevEbN0 = ebN0;
+                prevVal = val;
+            }
+            return null;
+        }
+
+        function buildCodingAndModulationMaps(headers) {
+            codingToModulations = {};
+            allCodings = [];
+            headers.forEach(header => {
+                const match = header.match(/^([^(]+)\s*\(([^)]+)\)$/);
+                if (match) {
+                    const coding = match[1].trim();
+                    const modulation = match[2].trim();
+
+                    // Exclude TCM schemes
+                    if (coding.toUpperCase().includes('TCM') || coding.toUpperCase().includes('CCSDS')) {
+                        return;
+                    }
+
+                    if (!codingToModulations[coding]) {
+                        codingToModulations[coding] = [];
+                        allCodings.push(coding);
+                    }
+                    if (!codingToModulations[coding].includes(modulation)) {
+                        codingToModulations[coding].push(modulation);
+                    }
+                    if (modulation === 'BPSK') {
+                        if (!codingToModulations[coding].includes('QPSK')) {
+                            codingToModulations[coding].push('QPSK');
+                        }
+                    }
+                }
+            });
+
+            // Sort coding options
+            allCodings.sort((a, b) => {
+                const aUncoded = a.toLowerCase().includes('uncoded');
+                const bUncoded = b.toLowerCase().includes('uncoded');
+                if (aUncoded && !bUncoded) return -1;
+                if (!aUncoded && bUncoded) return 1;
+
+                const aRS = a.toLowerCase().includes('rs');
+                const bRS = b.toLowerCase().includes('rs');
+                if (aRS && !bRS) return -1;
+                if (!aRS && bRS) return 1;
+
+                if (a.toLowerCase().includes('concat') && b.toLowerCase().includes('concat')) {
+                    const matchA = a.match(/Concat\s+(\d+)\/(\d+)/);
+                    const matchB = b.match(/Concat\s+(\d+)\/(\d+)/);
+                    if (matchA && matchB) {
+                        const rateA = parseInt(matchA[1]) / parseInt(matchA[2]);
+                        const rateB = parseInt(matchB[1]) / parseInt(matchB[2]);
+                        return rateA - rateB;
+                    }
+                }
+                return a.localeCompare(b);
+            });
+
+            updateCodingSelectDropdown();
+            updateModulationSelectDropdown();
+        }
+
+        function toggleSection(header) {
+            const section = header.closest('.sidebar-section');
+            const icon = header.querySelector('.collapse-icon');
+            if (section) {
+                const isCollapsed = section.classList.toggle('collapsed');
+                if (icon) {
+                    icon.innerText = isCollapsed ? '▶' : '▼';
+                }
+            }
+        }
+
+        function runSmartOptimization() {
+            const glob = appState.global_state;
+            const activeRx = getActiveReceiver();
+            const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+            const altKm = parseFloat(glob.alt_km);
+            const rxAltKm = 0.0; // Sea level reference
+
+            // Check if blocked by horizon
+            const hAngleBalloon = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altKm));
+            const hAngleRx = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + rxAltKm));
+            const maxHorizonGroundKm = EARTH_RADIUS_KM * (hAngleBalloon + hAngleRx);
+
+            const resultEl = document.getElementById('opt-result');
+            if (targetDist > maxHorizonGroundKm) {
+                resultEl.innerHTML = "<span style='color: var(--danger-color); font-weight: 600;'>❌ Link is blocked by Earth curvature.</span>";
+                return;
+            }
+
+            const activeProfile = appState.profiles[appState.active_profile_name];
+            if (!activeProfile) return;
+
+            const maxSymRateLimit = parseFloat(document.getElementById('opt_max_sym_rate').value) || 1000;
+            const maxModLimit = document.getElementById('opt_max_mod').value;
+            const pTx = parseFloat(activeProfile.p_tx);
+            const gTx = parseFloat(activeProfile.g_tx);
+            const gRx = parseFloat(activeProfile.g_rx);
+            const rxLoss = parseFloat(activeProfile.rx_loss);
+            const rtlNf = parseFloat(activeProfile.rtl_nf);
+            const implLoss = parseFloat(activeProfile.impl_loss);
+            const phaseJitter = parseFloat(activeProfile.phase_jitter);
+            const fMhz = Math.max(1, parseFloat(activeProfile.f_mhz));
+            const targetType = activeProfile.target_type || "BER";
+            const targetValue = parseFloat(activeProfile.target_value !== undefined ? activeProfile.target_value : 1e-5);
+
+            // 1. Calculate Received Power (targetPr)
+            const theta = targetDist / EARTH_RADIUS_KM;
+            const elevRad = Math.atan2((EARTH_RADIUS_KM + altKm) * Math.cos(theta) - (EARTH_RADIUS_KM + rxAltKm), (EARTH_RADIUS_KM + altKm) * Math.sin(theta));
+            const fGhz = fMhz / 1000.0;
+
+            const baseO2 = 0.007 * (1 + Math.pow(fGhz / 15.0, 2));
+            const peak60 = 15.0 / (1 + Math.pow((fGhz - 60.0) / 4.0, 4));
+            const peak22 = 0.18 / (1 + Math.pow((fGhz - 22.235) / 1.5, 2));
+            const peak118 = 2.0 / (1 + Math.pow((fGhz - 118.75) / 3.0, 4));
+            const A_zenith_total = baseO2 + peak60 + peak22 + peak118;
+            const altScale = Math.exp(0.0) - Math.exp(-altKm / 8.0);
+            const A_zenith_scaled = A_zenith_total * Math.max(0, altScale);
+            const sinE = Math.sin(Math.max(-0.5 * Math.PI / 180, elevRad));
+            const airmass = Math.min(40.0, 1.0 / (sinE + 0.025 * Math.exp(-11 * Math.max(0, sinE))));
+            const atmosLoss = A_zenith_scaled * airmass;
+
+            const targetAlpha = targetDist > 0 ? (targetDist / EARTH_RADIUS_KM) : 0.00001;
+            const val = Math.pow(EARTH_RADIUS_KM, 2) + Math.pow(EARTH_RADIUS_KM + altKm, 2) -
+                2 * EARTH_RADIUS_KM * (EARTH_RADIUS_KM + altKm) * Math.cos(targetAlpha);
+            const targetSlantRange = Math.sqrt(Math.max(val, 0.1));
+            const targetFspl = 20 * Math.log10(targetSlantRange) + 20 * Math.log10(fMhz) + 32.44;
+            const targetPr = pTx + gTx + gRx - rxLoss - targetFspl - atmosLoss;
+
+            // 2. Loop through all combinations of Coding & Modulation from CSV
+            let bestOption = null;
+            let maxKbps = -1;
+
+            const codings = (allCodings && allCodings.length > 0) ? allCodings : DEFAULT_CODINGS;
+
+            codings.forEach(coding => {
+                let allowedMods = [];
+                if (codingToModulations && codingToModulations[coding]) {
+                    allowedMods = codingToModulations[coding];
+                } else {
+                    allowedMods = DEFAULT_MODULATIONS;
+                }
+
+                allowedMods.forEach(modulation => {
+                    // Spectral efficiency m
+                    let m = 2;
+                    const mod = modulation.toUpperCase();
+                    if (mod.includes("BPSK")) m = 1;
+                    else if (mod.includes("QPSK")) m = 2;
+                    else if (mod.includes("8PSK") || mod.includes("8QAM")) m = 3;
+                    else if (mod.includes("16QAM") || mod.includes("16APSK")) m = 4;
+
+                    // Check max modulation limit
+                    let passesModLimit = true;
+                    if (maxModLimit !== 'any') {
+                        let limitM = 4;
+                        if (maxModLimit === 'BPSK') limitM = 1;
+                        else if (maxModLimit === 'QPSK') limitM = 2;
+                        else if (maxModLimit === '8PSK') limitM = 3;
+                        else if (maxModLimit === '16QAM') limitM = 4;
+
+                        if (m > limitM) {
+                            passesModLimit = false;
+                        }
+                    }
+                    if (!passesModLimit) return;
+
+                    // Coding Rate
+                    let codingRate = 1.0;
+                    if (coding.includes("Uncoded")) {
+                        codingRate = 1.0;
+                    } else if (coding.includes("Concat")) {
+                        const match = coding.match(/Concat\s+(\d+)\/(\d+)/);
+                        const inner = match ? (parseInt(match[1]) / parseInt(match[2])) : 0.5;
+                        codingRate = inner * (223 / 255);
+                    } else if (coding.includes("RS Depth")) {
+                        codingRate = 223 / 255;
+                    }
+
+                    // Look up Eb/N0 Required
+                    let ebN0Req = 0;
+                    if (berData && ferData) {
+                        const colName = getCSVColumnName(coding, modulation);
+                        const csvRows = targetType === "BER" ? berData : ferData;
+                        const req = getRequiredEbN0(csvRows, colName, targetValue);
+                        if (req !== null) {
+                            ebN0Req = req;
+                        } else {
+                            ebN0Req = Infinity;
+                        }
+                    } else {
+                        // Fallback
+                        let viterbiRate = "1/2";
+                        if (coding.includes("1/2")) viterbiRate = "1/2";
+                        else if (coding.includes("2/3")) viterbiRate = "2/3";
+                        else if (coding.includes("3/4")) viterbiRate = "3/4";
+                        else if (coding.includes("5/6")) viterbiRate = "5/6";
+                        else if (coding.includes("7/8")) viterbiRate = "7/8";
+
+                        let modPenaltyDb = 0.0;
+                        if (modulation === "BPSK" || modulation === "QPSK") {
+                            modPenaltyDb = 0.0;
+                        } else if (modulation === "8PSK") {
+                            modPenaltyDb = 3.5;
+                        } else if (modulation === "16APSK") {
+                            modPenaltyDb = 5.0;
+                        } else if (modulation === "16QAM") {
+                            modPenaltyDb = 5.5;
+                        }
+                        ebN0Req = (CCSDS_EB_N0[viterbiRate] || 2.6) + modPenaltyDb;
+                    }
+
+                    if (ebN0Req === Infinity) return;
+
+                    // Calculate max symbol rate Rs in kS/s
+                    const maxLogRb = targetPr + 173.98 - rtlNf - ebN0Req - implLoss - phaseJitter;
+                    const maxRb = Math.pow(10, maxLogRb / 10);
+                    let maxRs = maxRb / (m * codingRate * 1000); // kS/s
+
+                    // Limit to user constraint and min constraint (0.1 kS/s)
+                    let selectedRs = Math.min(maxRs, maxSymRateLimit);
+                    if (selectedRs < 0.1) return; // Cannot close link
+
+                    // Calculate actual data rate in kbps
+                    const kbps = selectedRs * m * codingRate;
+
+                    if (kbps > maxKbps) {
+                        maxKbps = kbps;
+                        bestOption = {
+                            coding: coding,
+                            modulation: modulation,
+                            symRate: selectedRs,
+                            kbps: kbps
+                        };
+                    }
+                });
+            });
+
+            if (bestOption) {
+                const finalRs = Math.round(bestOption.symRate * 10) / 10;
+
+                activeProfile.coding = bestOption.coding;
+                activeProfile.modulation = bestOption.modulation;
+                activeProfile.sym_rate = finalRs;
+
+                saveStateToStorage();
+                populateActiveProfileForm();
+                calculateAndRender(true);
+
+                resultEl.innerHTML = `<span style='color: var(--success-color); font-weight: 600;'>✓ Optimized: ${bestOption.modulation} + ${bestOption.coding} @ ${finalRs} kS/s (${bestOption.kbps.toFixed(1)} kbps)</span>`;
+            } else {
+                resultEl.innerHTML = "<span style='color: var(--danger-color); font-weight: 600;'>❌ Signal too weak. Try increasing TX power, antenna gains, or reducing distance.</span>";
+            }
+        }
+
+        function updateCodingSelectDropdown() {
+            const select = document.getElementById('p_coding');
+            if (!select) return;
+            const currentVal = select.value || (appState.profiles[appState.active_profile_name] ? appState.profiles[appState.active_profile_name].coding : "");
+            select.innerHTML = '';
+            const codings = (allCodings && allCodings.length > 0) ? allCodings : DEFAULT_CODINGS;
+            codings.forEach(coding => {
+                const opt = document.createElement('option');
+                opt.value = coding;
+                opt.innerText = coding;
+                select.appendChild(opt);
+            });
+            if (currentVal && codings.includes(currentVal)) {
+                select.value = currentVal;
+            }
+        }
+
+        function updateModulationSelectDropdown() {
+            const select = document.getElementById('p_modulation');
+            if (!select) return;
+            const codingSelect = document.getElementById('p_coding');
+            const selectedCoding = codingSelect ? codingSelect.value : (appState.profiles[appState.active_profile_name] ? appState.profiles[appState.active_profile_name].coding : "Concat 1/2 D4");
+            const currentVal = select.value || (appState.profiles[appState.active_profile_name] ? appState.profiles[appState.active_profile_name].modulation : "");
+            select.innerHTML = '';
+            let mods = [];
+            if (codingToModulations && codingToModulations[selectedCoding]) {
+                mods = codingToModulations[selectedCoding];
+            } else {
+                mods = DEFAULT_MODULATIONS;
+            }
+            mods.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.innerText = mod;
+                select.appendChild(opt);
+            });
+            if (currentVal && mods.includes(currentVal)) {
+                select.value = currentVal;
+            } else if (mods.length > 0) {
+                select.value = mods[0];
+            }
+        }
+
+        function onCodingChange() {
+            const codingSelect = document.getElementById('p_coding');
+            if (!codingSelect) return;
+            const selectedCoding = codingSelect.value;
+            appState.profiles[appState.active_profile_name].coding = selectedCoding;
+            updateModulationSelectDropdown();
+            const modSelect = document.getElementById('p_modulation');
+            const allowedMods = codingToModulations[selectedCoding] || [];
+            if (!allowedMods.includes(modSelect.value)) {
+                if (allowedMods.length > 0) {
+                    modSelect.value = allowedMods[0];
+                    appState.profiles[appState.active_profile_name].modulation = allowedMods[0];
+                }
+            }
+            saveStateToStorage();
+            calculateAndRender(true);
+        }
+
+        async function initCSVData() {
+            const localBer = localStorage.getItem('hab_ber_csv');
+            const localFer = localStorage.getItem('hab_fer_csv');
+            if (localBer && localFer) {
+                try {
+                    processCSVTexts(localBer, localFer);
+                    const statusEl = document.getElementById('csv-status');
+                    statusEl.innerText = "✓ CSV data loaded from cache.";
+                    statusEl.style.color = "var(--success-color)";
+                    fetchAndRefreshCSVs();
+                    return;
+                } catch (e) {
+                    console.error("Failed to parse cached CSV data:", e);
+                }
+            }
+            await loadDefaultCSVs();
+        }
+
+        async function fetchAndRefreshCSVs() {
+            try {
+                const berRes = await fetch('ber.csv');
+                const ferRes = await fetch('fer.csv');
+                if (berRes.ok && ferRes.ok) {
+                    const berText = await berRes.text();
+                    const ferText = await ferRes.text();
+                    localStorage.setItem('hab_ber_csv', berText);
+                    localStorage.setItem('hab_fer_csv', ferText);
+                    processCSVTexts(berText, ferText);
+                    const statusEl = document.getElementById('csv-status');
+                    statusEl.innerText = "✓ CSV data refreshed from server.";
+                    statusEl.style.color = "var(--success-color)";
+                }
+            } catch (e) {
+                console.log("Could not background refresh CSVs:", e);
+            }
+        }
+
+        async function loadDefaultCSVs() {
+            const statusEl = document.getElementById('csv-status');
+            const uploadCont = document.getElementById('csv-upload-container');
+            try {
+                const berRes = await fetch('ber.csv');
+                const ferRes = await fetch('fer.csv');
+                if (!berRes.ok || !ferRes.ok) {
+                    throw new Error("Local fetch returned non-200 status");
+                }
+                const berText = await berRes.text();
+                const ferText = await ferRes.text();
+                localStorage.setItem('hab_ber_csv', berText);
+                localStorage.setItem('hab_fer_csv', ferText);
+                processCSVTexts(berText, ferText);
+                statusEl.innerText = "✓ CSV data loaded successfully from server.";
+                statusEl.style.color = "var(--success-color)";
+                uploadCont.style.display = "none";
+            } catch (err) {
+                console.warn("Could not fetch CSV files automatically (likely CORS/file:// policy):", err);
+                statusEl.innerHTML = "⚠ Cannot load CSVs automatically.<br>Please select <strong>ber.csv</strong> and <strong>fer.csv</strong>:";
+                statusEl.style.color = "var(--fail-color)";
+                uploadCont.style.display = "block";
+            }
+        }
+
+        function processCSVTexts(berText, ferText) {
+            const parsedBer = parseCSV(berText);
+            const parsedFer = parseCSV(ferText);
+            berData = parsedBer.data;
+            ferData = parsedFer.data;
+            const headers = parsedBer.headers.filter(h => h.toLowerCase() !== 'eb/no (db)');
+            buildCodingAndModulationMaps(headers);
+            calculateAndRender(true);
+        }
+
+        let appState = {};
+        let map = null;
+        let balloonMarker = null;
+        let receiverMarkers = {};
+        let receiverLinkLines = {};
+
+        // Cache elements representing coverage circles and link segments on Leaflet map
+        let mapCircles = [];
+        let mapLinkLine = null;
+        let mapHorizonCircle = null;
+
+        // Canvas element bounds trackers for mouse events
+        let canvasState = {
+            cx: 0,
+            cy: 0,
+            R: 800,
+            bx: 0,
+            by: 0,
+            gx: 0,
+            gy: 0,
+            w: 0,
+            h: 0,
+            bAngle: -0.15,
+            hoveringBalloon: false,
+            hoveringGS: false,
+            mouseX: -9999,
+            mouseY: -9999
+        };
+        let draggedElement = null; // 'balloon', 'ground_station', or 'pan'
+        let zoomLevel = 1.0;
+        let panOffset = { x: 0, y: 0 };
+        let startPan = { x: 0, y: 0 };
+        let initialPanOffset = { x: 0, y: 0 };
+
+        // --- Core Math Computations ---
+        function calculateBeamFootprintRadiusKm(altKm, hpbwDeg) {
+            if (isNaN(hpbwDeg) || hpbwDeg <= 0) return 0;
+            const alphaRad = (hpbwDeg / 2) * Math.PI / 180;
+            const sinAlpha = Math.sin(alphaRad);
+            const k = ((EARTH_RADIUS_KM + altKm) / EARTH_RADIUS_KM) * sinAlpha;
+            if (k >= 1) {
+                // Limited by horizon
+                const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altKm));
+                return EARTH_RADIUS_KM * horizonAngle;
+            } else {
+                const angleBSC = Math.PI - Math.asin(k);
+                const psiRad = Math.PI - alphaRad - angleBSC;
+                return EARTH_RADIUS_KM * Math.max(0, psiRad);
+            }
+        }
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const rLat1 = lat1 * Math.PI / 180;
+            const rLat2 = lat2 * Math.PI / 180;
+
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(rLat1) * Math.cos(rLat2) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.asin(Math.sqrt(a));
+            return EARTH_RADIUS_KM * c;
+        }
+
+        function getBearing(lat1, lon1, lat2, lon2) {
+            const rLat1 = lat1 * Math.PI / 180;
+            const rLat2 = lat2 * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+
+            const y = Math.sin(dLon) * Math.cos(rLat2);
+            const x = Math.cos(rLat1) * Math.sin(rLat2) -
+                Math.sin(rLat1) * Math.cos(rLat2) * Math.cos(dLon);
+            return Math.atan2(y, x);
+        }
+
+        function getDestination(lat1, lon1, distance, bearing) {
+            const rLat1 = lat1 * Math.PI / 180;
+            const rLon1 = lon1 * Math.PI / 180;
+            const Ad = distance / EARTH_RADIUS_KM; // Angular distance
+
+            const lat2 = Math.asin(Math.sin(rLat1) * Math.cos(Ad) +
+                Math.cos(rLat1) * Math.sin(Ad) * Math.cos(bearing));
+            const lon2 = rLon1 + Math.atan2(Math.sin(bearing) * Math.sin(Ad) * Math.cos(rLat1),
+                Math.cos(Ad) - Math.sin(rLat1) * Math.sin(lat2));
+
+            return {
+                lat: lat2 * 180 / Math.PI,
+                lon: lon2 * 180 / Math.PI
+            };
+        }
+
+        function calculateLink(profile, globalState, targetDist) {
+            const symRate = Math.max(0.1, parseFloat(profile.sym_rate));
+            const rrcAlpha = Math.max(0, parseFloat(profile.rrc_alpha));
+            const coding = profile.coding || "Concat 1/2 D4";
+            const modulation = profile.modulation || "QPSK";
+            const targetType = profile.target_type || "BER";
+            const targetValue = parseFloat(profile.target_value !== undefined ? profile.target_value : 1e-5);
+            const pTx = parseFloat(profile.p_tx);
+            const gTx = parseFloat(profile.g_tx);
+            const gRx = parseFloat(profile.g_rx);
+            const rxLoss = parseFloat(profile.rx_loss);
+            const rtlNf = parseFloat(profile.rtl_nf);
+            const implLoss = parseFloat(profile.impl_loss);
+            const phaseJitter = parseFloat(profile.phase_jitter);
+            const fMhz = Math.max(1, parseFloat(profile.f_mhz));
+            const altKm = parseFloat(globalState.alt_km);
+            const rxAltM = parseFloat(globalState.rx_alt_m || 0);
+            const rxAltKm = 0.0; // Calculations treat ground station at sea level
+
+            let m = 2;
+            const mod = modulation.toUpperCase();
+            if (mod.includes("BPSK")) m = 1;
+            else if (mod.includes("QPSK")) m = 2;
+            else if (mod.includes("8PSK") || mod.includes("8QAM")) m = 3;
+            else if (mod.includes("16QAM") || mod.includes("16APSK")) m = 4;
+
+            let codingRate = 1.0;
+            if (coding.includes("Uncoded")) {
+                codingRate = 1.0;
+            } else if (coding.includes("Concat")) {
+                const match = coding.match(/Concat\s+(\d+)\/(\d+)/);
+                const inner = match ? (parseInt(match[1]) / parseInt(match[2])) : 0.5;
+                codingRate = inner * (223 / 255);
+            } else if (coding.includes("RS Depth")) {
+                codingRate = 223 / 255;
+            }
+
+            let ebN0Req = 0;
+            if (berData && ferData) {
+                const colName = getCSVColumnName(coding, modulation);
+                const csvRows = targetType === "BER" ? berData : ferData;
+                const req = getRequiredEbN0(csvRows, colName, targetValue);
+                if (req !== null) {
+                    ebN0Req = req;
+                } else {
+                    ebN0Req = Infinity;
+                }
+            } else {
+                // Fallback to original model
+                let viterbiRate = "1/2";
+                if (coding.includes("1/2")) viterbiRate = "1/2";
+                else if (coding.includes("2/3")) viterbiRate = "2/3";
+                else if (coding.includes("3/4")) viterbiRate = "3/4";
+                else if (coding.includes("5/6")) viterbiRate = "5/6";
+                else if (coding.includes("7/8")) viterbiRate = "7/8";
+
+                let modPenaltyDb = 0.0;
+                if (modulation === "BPSK" || modulation === "QPSK") {
+                    modPenaltyDb = 0.0;
+                } else if (modulation === "8PSK") {
+                    modPenaltyDb = 3.5;
+                } else if (modulation === "16APSK") {
+                    modPenaltyDb = 5.0;
+                } else if (modulation === "16QAM") {
+                    modPenaltyDb = 5.5;
+                }
+                ebN0Req = (CCSDS_EB_N0[viterbiRate] || 2.6) + modPenaltyDb;
+            }
+
+            const bwHz = symRate * 1000 * (1 + rrcAlpha);
+            const usableKbps = symRate * m * codingRate;
+
+            const reqSnrDb = ebN0Req === Infinity ? Infinity : ebN0Req + 10 * Math.log10((usableKbps * 1000) / bwHz);
+
+            const N_thermal = -173.98 + 10 * Math.log10(bwHz);
+            const N_effective = N_thermal + rtlNf;
+            const totalThreshold = reqSnrDb + implLoss + phaseJitter;
+            const PrMin = N_effective + totalThreshold;
+
+            // Calculate Elevation Angle and Atmospheric Loss
+            const theta = targetDist / EARTH_RADIUS_KM;
+            const elevRad = Math.atan2((EARTH_RADIUS_KM + altKm) * Math.cos(theta) - (EARTH_RADIUS_KM + rxAltKm), (EARTH_RADIUS_KM + altKm) * Math.sin(theta));
+
+            const fGhz = fMhz / 1000.0;
+
+            // Zenith attenuation model (ITU-R P.676 curve-fit approximation)
+            // Dry air (oxygen) zenith baseline is ~0.007 dB at low frequencies and increases with frequency
+            const baseO2 = 0.007 * (1 + Math.pow(fGhz / 15.0, 2));
+            const peak60 = 15.0 / (1 + Math.pow((fGhz - 60.0) / 4.0, 4));
+            const peak22 = 0.18 / (1 + Math.pow((fGhz - 22.235) / 1.5, 2));
+            const peak118 = 2.0 / (1 + Math.pow((fGhz - 118.75) / 3.0, 4));
+            const A_zenith_total = baseO2 + peak60 + peak22 + peak118;
+
+            // Scale by altitude difference (fraction of atmosphere column traversed from receiver to balloon)
+            const altScale = Math.exp(-rxAltKm / 8.0) - Math.exp(-altKm / 8.0);
+            const A_zenith_scaled = A_zenith_total * Math.max(0, altScale);
+
+            // Scale by airmass (elevation angle slant path)
+            const sinE = Math.sin(Math.max(-0.5 * Math.PI / 180, elevRad));
+            const airmass = Math.min(40.0, 1.0 / (sinE + 0.025 * Math.exp(-11 * Math.max(0, sinE))));
+            const atmosLoss = A_zenith_scaled * airmass;
+
+            // Max RF Range calculation accounting for worst-case (horizon edge) atmospheric loss
+            const atmosLossAtMaxRange = A_zenith_scaled * 40.0;
+            const FSPL_max = pTx + gTx + gRx - rxLoss - PrMin - atmosLossAtMaxRange;
+            let maxRfRangeKm = 0;
+            try {
+                maxRfRangeKm = Math.pow(10, (FSPL_max - 20 * Math.log10(fMhz) - 32.44) / 20);
+            } catch (e) {
+                maxRfRangeKm = 0;
+            }
+            if (isNaN(maxRfRangeKm) || !isFinite(maxRfRangeKm)) maxRfRangeKm = 0;
+
+            const targetAlpha = targetDist > 0 ? (targetDist / EARTH_RADIUS_KM) : 0.00001;
+
+            // Slant range logic taking both receiver and balloon altitude into account
+            const val = Math.pow(EARTH_RADIUS_KM + rxAltKm, 2) + Math.pow(EARTH_RADIUS_KM + altKm, 2) -
+                2 * (EARTH_RADIUS_KM + rxAltKm) * (EARTH_RADIUS_KM + altKm) * Math.cos(targetAlpha);
+            const targetSlantRange = Math.sqrt(Math.max(val, 0.1));
+
+            const targetFspl = 20 * Math.log10(targetSlantRange) + 20 * Math.log10(fMhz) + 32.44;
+            const targetPr = pTx + gTx + gRx - rxLoss - targetFspl - atmosLoss;
+            const targetSnr = targetPr - N_effective;
+            const targetMargin = targetSnr - totalThreshold;
+
+            return {
+                usable_kbps: usableKbps,
+                total_threshold: totalThreshold,
+                max_rf_range_km: maxRfRangeKm,
+                target_snr: targetSnr,
+                target_margin: targetMargin,
+                target_slant_range: targetSlantRange,
+                atmos_loss: atmosLoss
+            };
+        }
+
+        // --- LocalStorage Integration ---
+        function loadStateFromStorage() {
+            try {
+                const stored = localStorage.getItem('hab_multilink_state');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed && parsed.profiles && parsed.global_state) {
+                        appState = parsed;
+                        delete appState.global_state.click_mode;
+
+                        // Migrate/backfill global receivers list
+                        if (!appState.global_state.receivers) {
+                            const oldLat = appState.global_state.target_lat !== undefined ? appState.global_state.target_lat : 52.23;
+                            const oldLon = appState.global_state.target_lon !== undefined ? appState.global_state.target_lon : 21.01;
+                            const oldAlt = appState.global_state.rx_alt_m !== undefined ? appState.global_state.rx_alt_m : 0.0;
+                            appState.global_state.receivers = [
+                                { id: "rx_1", name: "Default Receiver", lat: oldLat, lon: oldLon, alt_m: oldAlt }
+                            ];
+                            appState.global_state.active_receiver_id = "rx_1";
+                        }
+
+                        // Backfill any missing fields in profiles from defaultState
+                        Object.keys(appState.profiles).forEach(name => {
+                            const prof = appState.profiles[name];
+                            if (prof.show_footprint === undefined) prof.show_footprint = false;
+                            if (prof.tx_hpbw === undefined) prof.tx_hpbw = 60;
+                            if (prof.tx_fnbw === undefined) prof.tx_fnbw = 120;
+                            if (prof.show_hpbw_ring === undefined) prof.show_hpbw_ring = true;
+                            if (prof.show_zero_dbi_ring === undefined) prof.show_zero_dbi_ring = true;
+                            if (prof.show_fnbw_ring === undefined) prof.show_fnbw_ring = true;
+                            if (prof.coding === undefined) {
+                                if (prof.viterbi_rate) {
+                                    prof.coding = `Concat ${prof.viterbi_rate} D4`;
+                                } else {
+                                    prof.coding = "Concat 1/2 D4";
+                                }
+                            }
+                            if (prof.target_type === undefined) prof.target_type = "BER";
+                            if (prof.target_value === undefined) prof.target_value = 1e-5;
+                            if (prof.modulation === undefined) prof.modulation = "QPSK";
+                            if (prof.hidden === undefined) prof.hidden = false;
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load state from localStorage:", e);
+            }
+            appState = JSON.parse(JSON.stringify(defaultState));
+        }
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem('hab_multilink_state', JSON.stringify(appState));
+            } catch (e) {
+                console.error("Failed to save state to localStorage:", e);
+            }
+        }
+
+        function resetToDefaults() {
+            if (confirm("Reset all profiles and global state to defaults?")) {
+                appState = JSON.parse(JSON.stringify(defaultState));
+                saveStateToStorage();
+                populateGlobalForm();
+                updateProfileSelectDropdown();
+                populateActiveProfileForm();
+                calculateAndRender(true);
+                map.setView([appState.global_state.lat, appState.global_state.lon], 6);
+            }
+        }
+
+        // --- Export/Import Utilities ---
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "hab_multilink_config.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed && parsed.profiles && parsed.global_state) {
+                        appState.global_state = parsed.global_state;
+                        appState.profiles = parsed.profiles;
+                        delete appState.global_state.click_mode;
+                        if (parsed.active_profile_name && appState.profiles[parsed.active_profile_name]) {
+                            appState.active_profile_name = parsed.active_profile_name;
+                        } else {
+                            appState.active_profile_name = Object.keys(appState.profiles)[0];
+                        }
+                        saveStateToStorage();
+
+                        populateGlobalForm();
+                        updateProfileSelectDropdown();
+                        populateActiveProfileForm();
+                        calculateAndRender(true);
+
+                        map.setView([appState.global_state.lat, appState.global_state.lon], 6);
+                        alert("Configuration imported successfully!");
+                    } else {
+                        alert("Invalid file format. Must contain 'global_state' and 'profiles'.");
+                    }
+                } catch (err) {
+                    alert("Error parsing JSON: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // --- Receivers Helpers ---
+        function getActiveReceiver() {
+            const glob = appState.global_state;
+            const rx = glob.receivers.find(r => r.id === glob.active_receiver_id);
+            return rx || glob.receivers[0];
+        }
+
+        function updateReceiverSelectDropdown() {
+            const select = document.getElementById('receiver-select');
+            if (!select) return;
+            select.innerHTML = '';
+            appState.global_state.receivers.forEach(rx => {
+                const opt = document.createElement('option');
+                opt.value = rx.id;
+                opt.innerText = rx.name;
+                if (rx.id === appState.global_state.active_receiver_id) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+
+            const deleteBtn = document.getElementById('btn-delete-receiver');
+            if (deleteBtn) {
+                deleteBtn.disabled = appState.global_state.receivers.length <= 1;
+            }
+        }
+
+        function addNewReceiver() {
+            const input = document.getElementById('new-receiver-name');
+            const name = input.value.trim();
+            if (!name) {
+                alert("Please enter a valid receiver name.");
+                return;
+            }
+
+            const glob = appState.global_state;
+            const id = "rx_" + Date.now();
+            const activeRx = getActiveReceiver();
+
+            // Offset a tiny bit so they don't overlap completely on creation
+            const newRx = {
+                id: id,
+                name: name,
+                lat: activeRx.lat + 0.05,
+                lon: activeRx.lon + 0.05,
+                alt_m: activeRx.alt_m
+            };
+
+            glob.receivers.push(newRx);
+            glob.active_receiver_id = id;
+            input.value = '';
+
+            saveStateToStorage();
+            populateGlobalForm();
+            calculateAndRender(true);
+        }
+
+        function deleteActiveReceiver() {
+            const glob = appState.global_state;
+            if (glob.receivers.length <= 1) {
+                alert("Cannot delete the last remaining receiver.");
+                return;
+            }
+
+            const activeRx = getActiveReceiver();
+            if (confirm(`Delete receiver "${activeRx.name}"?`)) {
+                // Remove marker and link line from map first
+                if (receiverMarkers[activeRx.id]) {
+                    map.removeLayer(receiverMarkers[activeRx.id]);
+                    delete receiverMarkers[activeRx.id];
+                }
+                if (receiverLinkLines[activeRx.id]) {
+                    map.removeLayer(receiverLinkLines[activeRx.id]);
+                    delete receiverLinkLines[activeRx.id];
+                }
+
+                glob.receivers = glob.receivers.filter(r => r.id !== activeRx.id);
+                glob.active_receiver_id = glob.receivers[0].id;
+
+                saveStateToStorage();
+                populateGlobalForm();
+                calculateAndRender(true);
+            }
+        }
+
+        // --- Form Sync Logic ---
+        function populateGlobalForm() {
+            const glob = appState.global_state;
+            document.getElementById('g_lat').value = glob.lat;
+            document.getElementById('g_lon').value = glob.lon;
+            document.getElementById('g_alt_km').value = glob.alt_km;
+
+            const activeRx = getActiveReceiver();
+            document.getElementById('g_target_lat').value = activeRx.lat;
+            document.getElementById('g_target_lon').value = activeRx.lon;
+            document.getElementById('g_rx_alt_m').value = activeRx.alt_m || 0;
+
+            updateReceiverSelectDropdown();
+        }
+
+        function fetchReceiverElevation() {
+            const btn = document.getElementById('btn-fetch-rx-alt');
+            const activeRx = getActiveReceiver();
+            const lat = activeRx.lat;
+            const lon = activeRx.lon;
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "fetching...";
+            }
+
+            const url = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error("Network response was not ok");
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && Array.isArray(data.elevation) && data.elevation.length > 0) {
+                        const elevM = data.elevation[0];
+                        activeRx.alt_m = Math.round(elevM);
+                        document.getElementById('g_rx_alt_m').value = activeRx.alt_m;
+                        saveStateToStorage();
+                        calculateAndRender(true);
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to fetch elevation:", err);
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerText = "Get Alt";
+                    }
+                });
+        }
+
+        // --- Reset Canvas View Helper ---
+        function resetCanvasView() {
+            autoFitCanvas();
+        }
+
+        let hasAutoFitted = false;
+
+        function interpolateColor(color1, color2, factor) {
+            const r = Math.round(color1[0] + factor * (color2[0] - color1[0]));
+            const g = Math.round(color1[1] + factor * (color2[1] - color1[1]));
+            const b = Math.round(color1[2] + factor * (color2[2] - color1[2]));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function getActiveBounds(glob, targetDist, maxHorizonGroundKm) {
+            const canvas = document.getElementById('profile-canvas');
+            const w = canvas ? canvas.width : 600;
+            const h = canvas ? canvas.height : 480;
+
+            const R = 800;
+            const cx = w / 2;
+            const cy = h + R - 60;
+
+            const bAngle = -0.15;
+            const altKm = parseFloat(glob.alt_km);
+            const altPx = Math.max(8, (altKm / 50.0) * 80.0);
+            const bRadius = R + altPx;
+
+            // Balloon point
+            const bx = cx + Math.sin(bAngle) * bRadius;
+            const by = cy - Math.cos(bAngle) * bRadius;
+
+            // Ground station point
+            const activeRx = getActiveReceiver();
+            const rxAltKm = parseFloat(activeRx.alt_m || 0) / 1000.0;
+            const targetAltPx = (rxAltKm / 50.0) * 80.0;
+            const gRadius = R + targetAltPx;
+
+            const thetaTangent = Math.acos(R / (R + altPx));
+            const ratio = maxHorizonGroundKm > 0 ? (targetDist / maxHorizonGroundKm) : 1;
+            const gAngle = bAngle + ratio * thetaTangent;
+
+            const gx = cx + Math.sin(gAngle) * gRadius;
+            const gy = cy - Math.cos(gAngle) * gRadius;
+
+            // Horizon point
+            const hAngle = bAngle + thetaTangent;
+            const hx = cx + Math.sin(hAngle) * R;
+            const hy = cy - Math.cos(hAngle) * R;
+
+            let points = [
+                { x: bx, y: by },
+                { x: gx, y: gy },
+                { x: hx, y: hy }
+            ];
+
+            // Sample Earth surface arc
+            const startAngle = Math.min(bAngle, gAngle, hAngle);
+            const endAngle = Math.max(bAngle, gAngle, hAngle);
+            const steps = 10;
+            for (let i = 0; i <= steps; i++) {
+                const angle = startAngle + (endAngle - startAngle) * (i / steps);
+                points.push({
+                    x: cx + Math.sin(angle) * R,
+                    y: cy - Math.cos(angle) * R
+                });
+            }
+
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+            points.forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            });
+
+            return { minX, maxX, minY, maxY };
+        }
+
+        function autoFitCanvas() {
+            const canvas = document.getElementById('profile-canvas');
+            if (!canvas) return;
+
+            const rect = canvas.getBoundingClientRect();
+            // In case rect is 0 (tab hidden), don't set invalid dimensions
+            const w = rect.width || canvas.width || 600;
+            const h = rect.height || canvas.height || 480;
+
+            canvas.width = w;
+            canvas.height = h;
+            canvasState.w = w;
+            canvasState.h = h;
+
+            const glob = appState.global_state;
+            const activeRx = getActiveReceiver();
+            const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+            const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+            const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+
+            const bounds = getActiveBounds(glob, targetDist, maxHorizonGroundKm);
+            const width = Math.max(20, bounds.maxX - bounds.minX);
+            const height = Math.max(20, bounds.maxY - bounds.minY);
+
+            const centerX = (bounds.minX + bounds.maxX) / 2;
+            const centerY = (bounds.minY + bounds.maxY) / 2;
+
+            const scaleX = (w * 0.8) / width;
+            const scaleY = (h * 0.65) / height;
+
+            zoomLevel = Math.min(scaleX, scaleY);
+            zoomLevel = Math.max(0.4, Math.min(40, zoomLevel));
+
+            panOffset.x = w / 2 - centerX * zoomLevel;
+            panOffset.y = h / 2 - centerY * zoomLevel;
+
+            drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+        }
+
+        function zoomCanvas(factor) {
+            const canvas = document.getElementById('profile-canvas');
+            if (!canvas) return;
+            const w = canvas.width;
+            const h = canvas.height;
+            const centerX = w / 2;
+            const centerY = h / 2;
+
+            const newZoom = zoomLevel * factor;
+            if (newZoom < 0.4 || newZoom > 40) return;
+
+            panOffset.x = centerX - (centerX - panOffset.x) * factor;
+            panOffset.y = centerY - (centerY - panOffset.y) * factor;
+            zoomLevel = newZoom;
+
+            const glob = appState.global_state;
+            const activeRx = getActiveReceiver();
+            const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+            const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+            const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+            drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+        }
+
+        function updateProfileSelectDropdown() {
+            const select = document.getElementById('profile-select');
+            select.innerHTML = '';
+            Object.keys(appState.profiles).forEach(name => {
+                const prof = appState.profiles[name];
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = (prof.hidden ? '⊘ ' : '') + name;
+                if (name === appState.active_profile_name) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+        }
+
+        function populateActiveProfileForm() {
+            const prof = appState.profiles[appState.active_profile_name];
+            if (!prof) return;
+
+            document.getElementById('p_f_mhz').value = prof.f_mhz;
+            document.getElementById('p_p_tx').value = prof.p_tx;
+            document.getElementById('p_g_tx').value = prof.g_tx;
+            document.getElementById('p_g_rx').value = prof.g_rx;
+            document.getElementById('p_rx_loss').value = prof.rx_loss;
+            document.getElementById('p_rtl_nf').value = prof.rtl_nf;
+            document.getElementById('p_sym_rate').value = prof.sym_rate;
+            document.getElementById('p_rrc_alpha').value = prof.rrc_alpha;
+            updateCodingSelectDropdown();
+            document.getElementById('p_coding').value = prof.coding || "Concat 1/2 D4";
+
+            updateModulationSelectDropdown();
+            document.getElementById('p_modulation').value = prof.modulation || "QPSK";
+
+            document.getElementById('p_target_type').value = prof.target_type || "BER";
+
+            const targetVal = prof.target_value !== undefined ? prof.target_value : 1e-5;
+            document.getElementById('p_target_value').value = targetVal;
+
+            // Sync the preset dropdown
+            const presetSelect = document.getElementById('p_target_value_preset');
+            const targetValStr = String(targetVal);
+            let foundPreset = false;
+            for (let i = 0; i < presetSelect.options.length; i++) {
+                if (presetSelect.options[i].value === targetValStr) {
+                    presetSelect.value = targetValStr;
+                    foundPreset = true;
+                    break;
+                }
+            }
+            if (!foundPreset) {
+                presetSelect.value = "custom";
+            }
+
+            document.getElementById('p_impl_loss').value = prof.impl_loss;
+            document.getElementById('p_phase_jitter').value = prof.phase_jitter;
+
+            // Sync Footprint and HPBW settings
+            const showFootprint = prof.show_footprint || false;
+            const txHpbw = prof.tx_hpbw !== undefined ? prof.tx_hpbw : 60;
+            const txFnbw = prof.tx_fnbw !== undefined ? prof.tx_fnbw : 120;
+            const showHpbwRing = prof.show_hpbw_ring !== undefined ? prof.show_hpbw_ring : true;
+            const showZeroDbiRing = prof.show_zero_dbi_ring !== undefined ? prof.show_zero_dbi_ring : true;
+            const showFnbwRing = prof.show_fnbw_ring !== undefined ? prof.show_fnbw_ring : true;
+
+            document.getElementById('p_show_footprint').checked = showFootprint;
+            document.getElementById('p_tx_hpbw').value = txHpbw;
+            document.getElementById('p_tx_fnbw').value = txFnbw;
+            document.getElementById('p_show_hpbw_ring').checked = showHpbwRing;
+            document.getElementById('p_show_zero_dbi_ring').checked = showZeroDbiRing;
+            document.getElementById('p_show_fnbw_ring').checked = showFnbwRing;
+
+            document.getElementById('hpbw-input-container').style.display = showFootprint ? 'block' : 'none';
+
+            const deleteBtn = document.getElementById('btn-delete-profile');
+            const profileCount = Object.keys(appState.profiles).length;
+            deleteBtn.disabled = profileCount <= 1;
+
+            const toggleBtn = document.getElementById('btn-toggle-profile-visibility');
+            if (toggleBtn) {
+                const isHidden = prof.hidden || false;
+                toggleBtn.innerText = isHidden ? 'Show' : 'Hide';
+                toggleBtn.className = isHidden ? 'btn btn-primary' : 'btn';
+            }
+        }
+
+        // --- Profile Management ---
+        function addNewProfile() {
+            const input = document.getElementById('new-profile-name');
+            const name = input.value.trim();
+            if (!name) {
+                alert("Please enter a valid profile name.");
+                return;
+            }
+            if (appState.profiles[name]) {
+                alert("A profile with this name already exists.");
+                return;
+            }
+
+            const activeProf = appState.profiles[appState.active_profile_name];
+            appState.profiles[name] = JSON.parse(JSON.stringify(activeProf));
+
+            appState.active_profile_name = name;
+            input.value = '';
+
+            saveStateToStorage();
+            updateProfileSelectDropdown();
+            populateActiveProfileForm();
+            calculateAndRender(true);
+        }
+
+        function deleteActiveProfile() {
+            const names = Object.keys(appState.profiles);
+            if (names.length <= 1) {
+                alert("Cannot delete the last remaining profile.");
+                return;
+            }
+
+            if (confirm(`Delete profile "${appState.active_profile_name}"?`)) {
+                delete appState.profiles[appState.active_profile_name];
+                appState.active_profile_name = Object.keys(appState.profiles)[0];
+
+                saveStateToStorage();
+                updateProfileSelectDropdown();
+                populateActiveProfileForm();
+                calculateAndRender(true);
+            }
+        }
+
+        function toggleActiveProfileVisibility() {
+            const prof = appState.profiles[appState.active_profile_name];
+            if (!prof) return;
+            prof.hidden = !prof.hidden;
+            saveStateToStorage();
+            populateActiveProfileForm();
+            calculateAndRender(true);
+        }
+
+        // --- Core Render Pipeline ---
+        function calculateAndRender(updateMarkers = true) {
+            const glob = appState.global_state;
+            const activeRx = getActiveReceiver();
+            const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+
+            const altKm = parseFloat(glob.alt_km);
+            const rxAltKm = 0.0; // Calculations treat ground station at sea level
+
+            const hAngleBalloon = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altKm));
+            const hAngleRx = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + rxAltKm));
+            const maxHorizonGroundKm = EARTH_RADIUS_KM * (hAngleBalloon + hAngleRx);
+
+            // Calculate Elevation Angle
+            const theta = targetDist / EARTH_RADIUS_KM;
+            const elevRad = Math.atan2((EARTH_RADIUS_KM + altKm) * Math.cos(theta) - (EARTH_RADIUS_KM + rxAltKm), (EARTH_RADIUS_KM + altKm) * Math.sin(theta));
+            const elevDeg = elevRad * 180 / Math.PI;
+
+            // Calculate Heading (Azimuth) from Active Receiver to Balloon
+            const bearingRad = getBearing(activeRx.lat, activeRx.lon, glob.lat, glob.lon);
+            const bearingDeg = (bearingRad * 180 / Math.PI + 360) % 360;
+
+            // Sync summary panel text
+            document.getElementById('lbl-summary-distance').innerText = targetDist.toFixed(1) + " km";
+            document.getElementById('lbl-summary-elevation').innerText = (targetDist > 0 ? elevDeg.toFixed(1) + "°" : "90.0°");
+            const lblHeading = document.getElementById('lbl-summary-heading');
+            if (lblHeading) {
+                lblHeading.innerText = (targetDist > 0 ? bearingDeg.toFixed(1) + "°" : "--°");
+            }
+            document.getElementById('lbl-summary-horizon').innerText = maxHorizonGroundKm.toFixed(1) + " km";
+
+            // Reset overlay elements
+            mapCircles.forEach(c => map.removeLayer(c));
+            mapCircles = [];
+            Object.keys(receiverLinkLines).forEach(id => {
+                map.removeLayer(receiverLinkLines[id]);
+            });
+            receiverLinkLines = {};
+            if (mapHorizonCircle) map.removeLayer(mapHorizonCircle);
+
+            // Sync positions of markers
+            if (updateMarkers) {
+                balloonMarker.setLatLng([glob.lat, glob.lon]);
+            }
+
+            const profileNames = Object.keys(appState.profiles).filter(n => !appState.profiles[n].hidden);
+
+            // Synchronize receiver markers
+            const currentRxIds = glob.receivers.map(r => r.id);
+            Object.keys(receiverMarkers).forEach(id => {
+                if (!currentRxIds.includes(id)) {
+                    map.removeLayer(receiverMarkers[id]);
+                    delete receiverMarkers[id];
+                }
+            });
+
+            glob.receivers.forEach(rx => {
+                const isActive = (rx.id === glob.active_receiver_id);
+                const fillHex = isActive ? "#ea580c" : "#2563eb"; // Orange for active, blue for inactive
+                const rxIconHtml = `
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="${fillHex}">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                `;
+                const rxIcon = L.divIcon({
+                    className: `leaflet-rx-icon-${rx.id}`,
+                    html: rxIconHtml,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                });
+
+                if (!receiverMarkers[rx.id]) {
+                    const marker = L.marker([rx.lat, rx.lon], {
+                        icon: rxIcon,
+                        draggable: true
+                    }).addTo(map);
+
+                    marker.on('drag', (e) => {
+                        const latLng = e.target.getLatLng();
+                        rx.lat = latLng.lat;
+                        rx.lon = latLng.lng;
+                        if (rx.id === glob.active_receiver_id) {
+                            document.getElementById('g_target_lat').value = latLng.lat.toFixed(4);
+                            document.getElementById('g_target_lon').value = latLng.lng.toFixed(4);
+                        }
+                        saveStateToStorage();
+                        calculateAndRender(false);
+                    });
+
+                    marker.on('dragend', () => {
+                        calculateAndRender(true);
+                        if (rx.id === glob.active_receiver_id) {
+                            fetchReceiverElevation();
+                        }
+                    });
+
+                    marker.on('click', () => {
+                        glob.active_receiver_id = rx.id;
+                        saveStateToStorage();
+                        populateGlobalForm();
+                        calculateAndRender(true);
+                    });
+
+                    receiverMarkers[rx.id] = marker;
+                } else {
+                    if (updateMarkers) {
+                        receiverMarkers[rx.id].setLatLng([rx.lat, rx.lon]);
+                        receiverMarkers[rx.id].setIcon(rxIcon);
+                    }
+                }
+            });
+
+            // Draw link lines for all receivers
+            glob.receivers.forEach(rx => {
+                const rxDist = haversine(glob.lat, glob.lon, rx.lat, rx.lon);
+                const isRxBlocked = rxDist > maxHorizonGroundKm;
+                const isActive = (rx.id === glob.active_receiver_id);
+
+                const polyLine = L.polyline([[glob.lat, glob.lon], [rx.lat, rx.lon]], {
+                    color: isRxBlocked ? '#dc2626' : '#16a34a',
+                    weight: isActive ? 4.5 : 2,
+                    dashArray: isRxBlocked ? '5, 8' : 'none',
+                    opacity: isActive ? 0.9 : 0.4
+                }).addTo(map);
+
+                receiverLinkLines[rx.id] = polyLine;
+
+                // Tooltip detailing all profiles link status to this receiver
+                let tooltipContent = `<div style="font-family: inherit; font-size: 0.8rem; padding: 0.2rem;">`;
+                tooltipContent += `<strong>${rx.name}</strong>${isActive ? ' <span style="color: #ea580c; font-weight: bold;">(Active)</span>' : ''}<br>`;
+                tooltipContent += `Distance: ${rxDist.toFixed(1)} km<br>`;
+
+                profileNames.forEach(profName => {
+                    const prof = appState.profiles[profName];
+                    const linkRes = calculateLink(prof, glob, rxDist);
+                    if (rxDist > maxHorizonGroundKm) {
+                        tooltipContent += `<span style="color: #dc2626; font-weight: bold;">●</span> ${profName}: Blocked<br>`;
+                    } else if (linkRes.target_margin >= 0) {
+                        tooltipContent += `<span style="color: #16a34a; font-weight: bold;">●</span> ${profName}: Lock (+${linkRes.target_margin.toFixed(1)} dB)<br>`;
+                    } else {
+                        tooltipContent += `<span style="color: #ea580c; font-weight: bold;">●</span> ${profName}: Fail (${linkRes.target_margin.toFixed(1)} dB)<br>`;
+                    }
+                });
+                tooltipContent += `</div>`;
+
+                if (updateMarkers) {
+                    receiverMarkers[rx.id].bindTooltip(tooltipContent, { direction: 'top' });
+                }
+                polyLine.bindTooltip(tooltipContent, { sticky: true });
+            });
+
+            // Geometric Horizon
+            mapHorizonCircle = L.circle([glob.lat, glob.lon], {
+                radius: maxHorizonGroundKm * 1000,
+                color: '#dc2626',
+                weight: 1.5,
+                dashArray: '5, 5',
+                fill: false,
+                opacity: 0.5
+            }).addTo(map);
+            mapHorizonCircle.bindTooltip("Geometric Horizon: " + maxHorizonGroundKm.toFixed(1) + " km");
+
+            // Metrics grid container building
+            const metricsContainer = document.getElementById('metrics-grid');
+            metricsContainer.innerHTML = '';
+
+            const rfLimitCircles = [];
+
+            profileNames.forEach((name, idx) => {
+                const prof = appState.profiles[name];
+                const res = calculateLink(prof, glob, targetDist);
+                const color = LINK_COLORS[idx % LINK_COLORS.length];
+
+                // Draw map overlay coverage circles
+                const usableRadiusKm = Math.min(res.max_rf_range_km, maxHorizonGroundKm);
+                if (usableRadiusKm > 0) {
+                    rfLimitCircles.push({
+                        rawRadiusKm: usableRadiusKm,
+                        color: color,
+                        tooltip: `${name} RF Limit: ${res.max_rf_range_km.toFixed(1)} km`,
+                        name: name
+                    });
+                }
+
+                // Draw antenna beam footprints if checked
+                if (prof.show_footprint) {
+                    const footprintCircles = [];
+
+                    // 1. First Null (FNBW) Ring
+                    const showFnbw = prof.show_fnbw_ring !== undefined ? prof.show_fnbw_ring : true;
+                    const fnbwVal = parseFloat(prof.tx_fnbw || 120);
+                    if (showFnbw && fnbwVal > 0) {
+                        const fnbwRadKm = calculateBeamFootprintRadiusKm(altKm, fnbwVal);
+                        if (fnbwRadKm > 0) {
+                            footprintCircles.push({
+                                radiusKm: fnbwRadKm,
+                                options: {
+                                    radius: fnbwRadKm * 1000,
+                                    color: color,
+                                    weight: 1.5,
+                                    dashArray: '10, 5',
+                                    fillColor: color,
+                                    fillOpacity: 0.03,
+                                    opacity: 0.6
+                                },
+                                tooltip: `${name} First Null (FNBW) Footprint (FNBW: ${fnbwVal}°): ${fnbwRadKm.toFixed(1)} km`
+                            });
+                        }
+                    }
+
+                    // 2. 0 dBi Gain Boundary Ring (only if peak gain > 0 dBi)
+                    const showZeroDbi = prof.show_zero_dbi_ring !== undefined ? prof.show_zero_dbi_ring : true;
+                    const gTx = parseFloat(prof.g_tx || 0);
+                    if (showZeroDbi && gTx > 0) {
+                        const hpbwVal = parseFloat(prof.tx_hpbw || 60);
+                        const zeroDbiBw = Math.min(179, hpbwVal * Math.sqrt(gTx / 3));
+                        const zeroDbiRadKm = calculateBeamFootprintRadiusKm(altKm, zeroDbiBw);
+                        if (zeroDbiRadKm > 0) {
+                            footprintCircles.push({
+                                radiusKm: zeroDbiRadKm,
+                                options: {
+                                    radius: zeroDbiRadKm * 1000,
+                                    color: color,
+                                    weight: 1.5,
+                                    dashArray: '2, 5',
+                                    fillColor: color,
+                                    fillOpacity: 0.05,
+                                    opacity: 0.5
+                                },
+                                tooltip: `${name} 0 dBi Gain boundary (Beamwidth: ${zeroDbiBw.toFixed(1)}°): ${zeroDbiRadKm.toFixed(1)} km`
+                            });
+                        }
+                    }
+
+                    // 3. HPBW Ring (-3 dB) (smallest, draw last/top)
+                    const showHpbw = prof.show_hpbw_ring !== undefined ? prof.show_hpbw_ring : true;
+                    if (showHpbw) {
+                        const hpbwRadKm = calculateBeamFootprintRadiusKm(altKm, prof.tx_hpbw || 60);
+                        if (hpbwRadKm > 0) {
+                            footprintCircles.push({
+                                radiusKm: hpbwRadKm,
+                                options: {
+                                    radius: hpbwRadKm * 1000,
+                                    color: color,
+                                    weight: 2,
+                                    dashArray: '5, 5',
+                                    fillColor: color,
+                                    fillOpacity: 0.1,
+                                    opacity: 0.7
+                                },
+                                tooltip: `${name} HPBW (-3 dB) Footprint (HPBW: ${prof.tx_hpbw}°): ${hpbwRadKm.toFixed(1)} km`
+                            });
+                        }
+                    }
+
+                    // Sort descending so largest is drawn first (at bottom)
+                    footprintCircles.sort((a, b) => b.radiusKm - a.radiusKm);
+                    footprintCircles.forEach(c => {
+                        const circleObj = L.circle([glob.lat, glob.lon], c.options).addTo(map);
+                        circleObj.bindTooltip(c.tooltip);
+                        mapCircles.push(circleObj);
+                    });
+                }
+
+                // Card instantiation
+                const card = document.createElement('div');
+                card.className = `metric-card ${name === appState.active_profile_name ? 'active' : ''}`;
+                card.style.borderLeftColor = color;
+
+                card.addEventListener('click', () => {
+                    appState.active_profile_name = name;
+                    document.getElementById('profile-select').value = name;
+                    saveStateToStorage();
+                    populateActiveProfileForm();
+                    calculateAndRender(true);
+                });
+
+                let badgeClass = '';
+                let statusText = '';
+                if (targetDist > maxHorizonGroundKm) {
+                    badgeClass = 'badge-blocked';
+                    statusText = 'Blocked';
+                } else if (res.target_margin >= 0) {
+                    badgeClass = 'badge-lock';
+                    statusText = `Lock: +${res.target_margin.toFixed(1)} dB`;
+                } else {
+                    badgeClass = 'badge-fail';
+                    statusText = `Fail: ${res.target_margin.toFixed(1)} dB`;
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="card-title" style="color: ${color}">${name}</span>
+                        <span class="card-status-badge ${badgeClass}">${statusText}</span>
+                    </div>
+                    <div class="card-metrics">
+                        <div class="card-metric-item">
+                            <span class="metric-label">Max Range</span>
+                            <span class="metric-value">${res.max_rf_range_km > 10000 ? '>10k' : res.max_rf_range_km.toFixed(1)} km</span>
+                        </div>
+                        <div class="card-metric-item">
+                            <span class="metric-label">Data Rate</span>
+                            <span class="metric-value">${res.usable_kbps.toFixed(1)} kbps</span>
+                        </div>
+                    </div>
+                    <div class="card-snr">
+                        Req. SNR: ${res.total_threshold.toFixed(1)} dB | Proj. SNR: ${res.target_snr.toFixed(1)} dB | Atmos: -${res.atmos_loss.toFixed(2)} dB
+                    </div>
+                `;
+                metricsContainer.appendChild(card);
+            });
+
+            // Sort RF Limit coverage circles descending (largest first) and draw them
+            rfLimitCircles.sort((a, b) => b.rawRadiusKm - a.rawRadiusKm);
+            rfLimitCircles.forEach((c, sortedIdx) => {
+                const offsetRadius = c.rawRadiusKm - (sortedIdx * 0.4);
+                const circle = L.circle([glob.lat, glob.lon], {
+                    radius: Math.max(offsetRadius * 1000, 1),
+                    color: c.color,
+                    weight: 2,
+                    fillColor: c.color,
+                    fillOpacity: 0.05,
+                    opacity: 0.5
+                }).addTo(map);
+                circle.bindTooltip(c.tooltip);
+                mapCircles.push(circle);
+            });
+
+            // Draw profile curvature
+            drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+        }
+
+        // --- Canvas Altitude & Curve Drawing ---
+        function drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm) {
+            const canvas = document.getElementById('profile-canvas');
+            if (!canvas) return;
+
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width || canvas.width;
+            canvas.height = rect.height || canvas.height;
+
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            const R = 800; // Curvature radius in px
+            const cx = w / 2;
+            const cy = h + R - 60; // Center of Earth downward
+
+            const altKm = parseFloat(glob.alt_km);
+            const altPx = Math.max(8, (altKm / 50.0) * 80.0); // Map 0..50km to 0..80px
+            const bAngle = -0.15;
+
+            // Sky gradient based on altitude (daylight at 0km, edge-of-space dark indigo/black at 50km)
+            const skyTopDay = [186, 230, 253]; // #bae6fd
+            const skyTopSpace = [3, 7, 18]; // #030712
+            const skyBottomDay = [248, 250, 252]; // #f8fafc
+            const skyBottomSpace = [30, 27, 75]; // #1e1b4b
+
+            const altPercent = Math.min(1.0, Math.max(0.0, altKm / 50.0));
+            const topColor = interpolateColor(skyTopDay, skyTopSpace, altPercent);
+            const bottomColor = interpolateColor(skyBottomDay, skyBottomSpace, altPercent);
+
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+            skyGrad.addColorStop(0, topColor);
+            skyGrad.addColorStop(1, bottomColor);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Apply scale and pan transformation
+            ctx.save();
+            ctx.translate(panOffset.x, panOffset.y);
+            ctx.scale(zoomLevel, zoomLevel);
+
+            // Atmosphere glow (blue semi-transparent arc just above earth surface)
+            ctx.beginPath();
+            ctx.arc(cx, cy, R + 12 / zoomLevel, Math.PI, 2 * Math.PI);
+            const atmosGrad = ctx.createRadialGradient(cx, cy, R, cx, cy, R + 12 / zoomLevel);
+            atmosGrad.addColorStop(0, 'rgba(56, 189, 248, 0.45)'); // sky-400
+            atmosGrad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+            ctx.fillStyle = atmosGrad;
+            ctx.fill();
+
+            // Earth body with a nice gradient (deep soil/bedrock color fading downwards)
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, Math.PI, 2 * Math.PI);
+            const earthGrad = ctx.createRadialGradient(cx, cy, R - 150, cx, cy, R);
+            earthGrad.addColorStop(0, '#cbd5e1'); // slate-300
+            earthGrad.addColorStop(1, '#e2e8f0'); // slate-200
+            ctx.fillStyle = earthGrad;
+            ctx.fill();
+
+            // Earth surface stroke (grass layer)
+            ctx.beginPath();
+            ctx.arc(cx, cy, R, Math.PI, 2 * Math.PI);
+            ctx.strokeStyle = '#22c55e'; // green-500
+            ctx.lineWidth = 3.5 / zoomLevel;
+            ctx.stroke();
+
+            // Earth boundary line (thin darker border below grass)
+            ctx.beginPath();
+            ctx.arc(cx, cy, R - 2 / zoomLevel, Math.PI, 2 * Math.PI);
+            ctx.strokeStyle = '#94a3b8'; // slate-400
+            ctx.lineWidth = 1 / zoomLevel;
+            ctx.stroke();
+
+            // Draw Balloon
+            const bRadius = R + altPx;
+            const bx = cx + Math.sin(bAngle) * bRadius;
+            const by = cy - Math.cos(bAngle) * bRadius;
+
+            // Draw TX Antenna Beam Footprint if active profile has it enabled
+            const activeProf = appState.profiles[appState.active_profile_name];
+            if (activeProf && activeProf.show_footprint) {
+                const activeIdx = Object.keys(appState.profiles).indexOf(appState.active_profile_name);
+                const profColor = LINK_COLORS[activeIdx >= 0 ? activeIdx % LINK_COLORS.length : 0];
+
+                const hexToRgba = (hex, alpha) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                };
+
+                // Function to draw a single beam cone wedge
+                const drawConeWedge = (beamwidth, maxAlpha, minAlpha, edgeAlpha, dashPattern) => {
+                    if (isNaN(beamwidth) || beamwidth <= 0) return;
+                    const alphaRad = (beamwidth / 2) * Math.PI / 180;
+                    const sinAlpha = Math.sin(alphaRad);
+                    const k = ((EARTH_RADIUS_KM + altKm) / EARTH_RADIUS_KM) * sinAlpha;
+
+                    let psi;
+                    if (k >= 1) {
+                        psi = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altKm));
+                    } else {
+                        const angleBSC = Math.PI - Math.asin(k);
+                        psi = Math.PI - alphaRad - angleBSC;
+                    }
+
+                    const startAngle = bAngle - psi;
+                    const endAngle = bAngle + psi;
+
+                    const x1 = cx + Math.sin(startAngle) * R;
+                    const y1 = cy - Math.cos(startAngle) * R;
+                    const x2 = cx + Math.sin(endAngle) * R;
+                    const y2 = cy - Math.cos(endAngle) * R;
+
+                    // Fill the cone wedge
+                    if (maxAlpha > 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(bx, by);
+                        ctx.lineTo(x1, y1);
+
+                        const canvasStartAngle = startAngle - Math.PI / 2;
+                        const canvasEndAngle = endAngle - Math.PI / 2;
+                        ctx.arc(cx, cy, R, canvasStartAngle, canvasEndAngle, false);
+                        ctx.lineTo(bx, by);
+                        ctx.closePath();
+
+                        const coneGrad = ctx.createRadialGradient(bx, by, 0, bx, by, altPx + 20);
+                        coneGrad.addColorStop(0, hexToRgba(profColor, maxAlpha));
+                        coneGrad.addColorStop(0.3, hexToRgba(profColor, (maxAlpha + minAlpha) / 2));
+                        coneGrad.addColorStop(1, hexToRgba(profColor, minAlpha));
+
+                        ctx.fillStyle = coneGrad;
+                        ctx.fill();
+                    }
+
+                    // Stroke the edges of the cone wedge
+                    if (edgeAlpha > 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(bx, by);
+                        ctx.lineTo(x2, y2);
+                        ctx.strokeStyle = hexToRgba(profColor, edgeAlpha);
+                        ctx.lineWidth = 1.2 / zoomLevel;
+                        if (dashPattern) {
+                            ctx.setLineDash(dashPattern.map(d => d / zoomLevel));
+                        } else {
+                            ctx.setLineDash([]);
+                        }
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                };
+
+                // Collect and sort wedges by beamwidth angle descending (widest first)
+                const wedges = [];
+
+                const showFnbw = activeProf.show_fnbw_ring !== undefined ? activeProf.show_fnbw_ring : true;
+                const fnbwVal = parseFloat(activeProf.tx_fnbw || 120);
+                if (showFnbw && fnbwVal > 0) {
+                    wedges.push({
+                        angle: fnbwVal,
+                        maxAlpha: 0.1,
+                        minAlpha: 0.01,
+                        edgeAlpha: 0.25,
+                        dashPattern: [10, 5]
+                    });
+                }
+
+                const showZeroDbi = activeProf.show_zero_dbi_ring !== undefined ? activeProf.show_zero_dbi_ring : true;
+                const gTx = parseFloat(activeProf.g_tx || 0);
+                if (showZeroDbi && gTx > 0) {
+                    const hpbwVal = parseFloat(activeProf.tx_hpbw || 60);
+                    const zeroDbiBw = Math.min(179, hpbwVal * Math.sqrt(gTx / 3));
+                    wedges.push({
+                        angle: zeroDbiBw,
+                        maxAlpha: 0.18,
+                        minAlpha: 0.02,
+                        edgeAlpha: 0.35,
+                        dashPattern: [2, 5]
+                    });
+                }
+
+                const showHpbw = activeProf.show_hpbw_ring !== undefined ? activeProf.show_hpbw_ring : true;
+                const hpbwVal = parseFloat(activeProf.tx_hpbw || 60);
+                if (showHpbw && hpbwVal > 0) {
+                    wedges.push({
+                        angle: hpbwVal,
+                        maxAlpha: 0.3,
+                        minAlpha: 0.04,
+                        edgeAlpha: 0.45,
+                        dashPattern: [5, 5]
+                    });
+                }
+
+                wedges.sort((a, b) => b.angle - a.angle);
+                wedges.forEach(w => {
+                    drawConeWedge(w.angle, w.maxAlpha, w.minAlpha, w.edgeAlpha, w.dashPattern);
+                });
+            }
+
+            // Vertical altitude drop line
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            const bxSurf = cx + Math.sin(bAngle) * R;
+            const bySurf = cy - Math.cos(bAngle) * R;
+            ctx.lineTo(bxSurf, bySurf);
+            ctx.strokeStyle = '#64748b'; // slate-500
+            ctx.lineWidth = 1.2 / zoomLevel;
+            ctx.setLineDash([3 / zoomLevel, 3 / zoomLevel]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Balloon dot
+            ctx.beginPath();
+            ctx.arc(bx, by, 7.5 / zoomLevel, 0, 2 * Math.PI);
+            ctx.fillStyle = '#dc2626';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5 / zoomLevel;
+            ctx.stroke();
+
+            // Hover glow ring for balloon
+            if (canvasState.hoveringBalloon || draggedElement === 'balloon') {
+                ctx.beginPath();
+                ctx.arc(bx, by, 14 / zoomLevel, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(220, 38, 38, 0.35)';
+                ctx.lineWidth = 3 / zoomLevel;
+                ctx.stroke();
+            }
+
+            // Map distance to visual angle
+            const thetaTangent = Math.acos(R / (R + altPx));
+            const ratio = maxHorizonGroundKm > 0 ? (targetDist / maxHorizonGroundKm) : 1;
+            const gAngle = bAngle + ratio * thetaTangent;
+
+            const activeRx = getActiveReceiver();
+            const rxAltKm = parseFloat(activeRx.alt_m || 0) / 1000.0;
+            const targetAltPx = (rxAltKm / 50.0) * 80.0;
+            const gRadius = R + targetAltPx;
+
+            const gx = cx + Math.sin(gAngle) * gRadius;
+            const gy = cy - Math.cos(gAngle) * gRadius;
+
+            // Vertical altitude drop line for ground station
+            ctx.beginPath();
+            ctx.moveTo(gx, gy);
+            const gxSurf = cx + Math.sin(gAngle) * R;
+            const gySurf = cy - Math.cos(gAngle) * R;
+            ctx.lineTo(gxSurf, gySurf);
+            ctx.strokeStyle = '#64748b'; // slate-500
+            ctx.lineWidth = 1.2 / zoomLevel;
+            ctx.setLineDash([3 / zoomLevel, 3 / zoomLevel]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Station Marker
+            ctx.beginPath();
+            ctx.arc(gx, gy, 7.0 / zoomLevel, 0, 2 * Math.PI);
+            ctx.fillStyle = '#2563eb';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5 / zoomLevel;
+            ctx.stroke();
+
+            // Hover glow ring for ground station
+            if (canvasState.hoveringGS || draggedElement === 'ground_station') {
+                ctx.beginPath();
+                ctx.arc(gx, gy, 13 / zoomLevel, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(37, 99, 235, 0.35)';
+                ctx.lineWidth = 3 / zoomLevel;
+                ctx.stroke();
+            }
+
+            // Draw Tangent horizon line
+            const hAngle = bAngle + thetaTangent;
+            const hx = cx + Math.sin(hAngle) * R;
+            const hy = cy - Math.cos(hAngle) * R;
+
+            // Horizon Point marker
+            ctx.beginPath();
+            ctx.arc(hx, hy, 3.5 / zoomLevel, 0, 2 * Math.PI);
+            ctx.fillStyle = '#b91c1c';
+            ctx.fill();
+
+            // Tangent line ray
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(hx, hy);
+            const extX = hx + (hx - bx) * 0.4;
+            const extY = hy + (hy - by) * 0.4;
+            ctx.lineTo(extX, extY);
+            ctx.strokeStyle = 'rgba(185, 28, 28, 0.45)';
+            ctx.lineWidth = 1.2 / zoomLevel;
+            ctx.setLineDash([4 / zoomLevel, 4 / zoomLevel]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw RF Link Line
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(gx, gy);
+
+            if (targetDist > maxHorizonGroundKm) {
+                // Curved Earth Blockage
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 2.2 / zoomLevel;
+                ctx.setLineDash([3 / zoomLevel, 3 / zoomLevel]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            } else {
+                // Clear Line of Sight
+                ctx.strokeStyle = '#16a34a';
+                ctx.lineWidth = 2.8 / zoomLevel;
+                ctx.stroke();
+            }
+
+            // Restore transformation context
+            ctx.restore();
+
+            // Project physical screen positions for drawing text labels and drag boundaries
+            const bx_phys = bx * zoomLevel + panOffset.x;
+            const by_phys = by * zoomLevel + panOffset.y;
+            const gx_phys = gx * zoomLevel + panOffset.x;
+            const gy_phys = gy * zoomLevel + panOffset.y;
+            const hx_phys = hx * zoomLevel + panOffset.x;
+            const hy_phys = hy * zoomLevel + panOffset.y;
+
+            // Draw text labels in constant size (un-scaled)
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText("Balloon Payload", bx_phys - 30, by_phys - 20);
+            ctx.fillStyle = '#475569';
+            ctx.font = '9px sans-serif';
+            ctx.fillText(`Alt: ${altKm.toFixed(1)} km`, bx_phys - 30, by_phys - 10);
+
+            // Prevent Ground Station text overlap when close to balloon
+            const isClose = Math.abs(gx_phys - bx_phys) < 100 && Math.abs(gy_phys - by_phys) < 100;
+            const gsLabelX = isClose ? gx_phys + 15 : gx_phys + 10;
+            const gsLabelY = isClose ? gy_phys + 15 : gy_phys - 6;
+
+            // Calculate elevation angle for visual label
+            const canvasTheta = targetDist / EARTH_RADIUS_KM;
+            const canvasElevRad = Math.atan2((EARTH_RADIUS_KM + altKm) * Math.cos(canvasTheta) - EARTH_RADIUS_KM, (EARTH_RADIUS_KM + altKm) * Math.sin(canvasTheta));
+            const canvasElevDeg = canvasElevRad * 180 / Math.PI;
+
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText("Ground Station", gsLabelX, gsLabelY);
+            ctx.fillStyle = '#475569';
+            ctx.font = '9px sans-serif';
+            ctx.fillText(`${targetDist.toFixed(1)} km | Elev: ${targetDist > 0 ? canvasElevDeg.toFixed(1) + "°" : "90.0°"}`, gsLabelX, gsLabelY + 10);
+
+            ctx.fillStyle = '#b91c1c';
+            ctx.font = '9px sans-serif';
+            ctx.fillText("Horizon Limit", hx_phys - 20, hy_phys + 14);
+
+            // Draw status overlay text
+            ctx.fillStyle = '#0f172a';
+            ctx.font = 'bold 11px sans-serif';
+            if (targetDist > maxHorizonGroundKm) {
+                ctx.fillStyle = '#b91c1c';
+                ctx.fillText("Blocked by Curvature", w - 150, 25);
+            } else {
+                ctx.fillStyle = '#15803d';
+                ctx.fillText("Line of Sight Clear", w - 150, 25);
+            }
+
+            // Cache physical coordinates in canvasState
+            canvasState.cx = cx;
+            canvasState.cy = cy;
+            canvasState.R = R;
+            canvasState.bx = bx_phys;
+            canvasState.by = by_phys;
+            canvasState.gx = gx_phys;
+            canvasState.gy = gy_phys;
+            canvasState.w = w;
+            canvasState.h = h;
+
+            canvasState.logical_bx = bx;
+            canvasState.logical_by = by;
+            canvasState.logical_gx = gx;
+            canvasState.logical_gy = gy;
+        }
+
+        // --- Canvas Interactive Dragging & Panning & Zooming ---
+        function setupCanvasDrag() {
+            const canvas = document.getElementById('profile-canvas');
+            if (!canvas) return;
+
+            function getMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                return { x, y };
+            }
+
+            // Mouse Wheel Zoom
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const pos = getMousePos(e);
+
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+                const newZoom = zoomLevel * zoomFactor;
+                if (newZoom < 0.4 || newZoom > 40) return;
+
+                panOffset.x = pos.x - (pos.x - panOffset.x) * zoomFactor;
+                panOffset.y = pos.y - (pos.y - panOffset.y) * zoomFactor;
+                zoomLevel = newZoom;
+
+                const glob = appState.global_state;
+                const activeRx = getActiveReceiver();
+                const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+                drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+            });
+
+            canvas.addEventListener('mousedown', (e) => {
+                const pos = getMousePos(e);
+                const distToBalloon = Math.sqrt(Math.pow(pos.x - canvasState.bx, 2) + Math.pow(pos.y - canvasState.by, 2));
+                const distToGS = Math.sqrt(Math.pow(pos.x - canvasState.gx, 2) + Math.pow(pos.y - canvasState.gy, 2));
+
+                if (distToBalloon < 24) {
+                    draggedElement = 'balloon';
+                    canvas.style.cursor = 'grabbing';
+                } else if (distToGS < 24) {
+                    draggedElement = 'ground_station';
+                    canvas.style.cursor = 'grabbing';
+                } else {
+                    draggedElement = 'pan';
+                    startPan = { x: e.clientX, y: e.clientY };
+                    initialPanOffset = { ...panOffset };
+                    canvas.style.cursor = 'move';
+                }
+
+                // Redraw on click to show grabbed status
+                const glob = appState.global_state;
+                const activeRx = getActiveReceiver();
+                const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                const maxHorizonGroundKm = EARTH_RADIUS_KM * Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                const pos = getMousePos(e);
+                canvasState.mouseX = pos.x;
+                canvasState.mouseY = pos.y;
+
+                const glob = appState.global_state;
+                const R = canvasState.R;
+                const cx = canvasState.cx;
+                const cy = canvasState.cy;
+                const bAngle = canvasState.bAngle;
+                const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+
+                if (!draggedElement) {
+                    const distToBalloon = Math.sqrt(Math.pow(pos.x - canvasState.bx, 2) + Math.pow(pos.y - canvasState.by, 2));
+                    const distToGS = Math.sqrt(Math.pow(pos.x - canvasState.gx, 2) + Math.pow(pos.y - canvasState.gy, 2));
+
+                    let cursorStyle = 'default';
+                    let needsRedraw = false;
+
+                    const isNearBalloon = distToBalloon < 24;
+                    const isNearGS = distToGS < 24;
+
+                    if (isNearBalloon || isNearGS) {
+                        cursorStyle = 'pointer';
+                    }
+
+                    if (isNearBalloon !== canvasState.hoveringBalloon || isNearGS !== canvasState.hoveringGS) {
+                        canvasState.hoveringBalloon = isNearBalloon;
+                        canvasState.hoveringGS = isNearGS;
+                        needsRedraw = true;
+                    }
+
+                    if (canvas.style.cursor !== cursorStyle) {
+                        canvas.style.cursor = cursorStyle;
+                    }
+
+                    if (needsRedraw) {
+                        const activeRx = getActiveReceiver();
+                        drawCurvatureProfile(glob, haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon), maxHorizonGroundKm);
+                    }
+                    return;
+                }
+
+                if (draggedElement === 'pan') {
+                    // Update Panning Offset
+                    const dx = e.clientX - startPan.x;
+                    const dy = e.clientY - startPan.y;
+                    panOffset.x = initialPanOffset.x + dx;
+                    panOffset.y = initialPanOffset.y + dy;
+
+                    const activeRx = getActiveReceiver();
+                    drawCurvatureProfile(glob, haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon), maxHorizonGroundKm);
+                } else if (draggedElement === 'balloon') {
+                    // Project physical mouse back to logical coordinates
+                    const lx = (pos.x - panOffset.x) / zoomLevel;
+                    const ly = (pos.y - panOffset.y) / zoomLevel;
+
+                    const dx = lx - cx;
+                    const dy = ly - cy;
+                    const distToCenter = Math.sqrt(dx * dx + dy * dy);
+                    const altPx = distToCenter - R;
+                    let altKm = (altPx / 80.0) * 50.0;
+                    altKm = Math.max(0.1, Math.min(50.0, altKm));
+
+                    appState.global_state.alt_km = Math.round(altKm * 10) / 10;
+                    document.getElementById('g_alt_km').value = appState.global_state.alt_km;
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                } else if (draggedElement === 'ground_station') {
+                    // Project physical mouse back to logical coordinates
+                    const lx = (pos.x - panOffset.x) / zoomLevel;
+                    const ly = (pos.y - panOffset.y) / zoomLevel;
+
+                    const dx = lx - cx;
+                    const dy = ly - cy;
+                    const mouseAngle = Math.atan2(dx, -dy);
+                    const relativeAngle = mouseAngle - bAngle;
+
+                    const altPx = Math.max(8, (glob.alt_km / 50.0) * 80.0);
+                    const thetaTangent = Math.acos(R / (R + altPx));
+                    const ratio = relativeAngle / thetaTangent;
+
+                    let newDist = ratio * maxHorizonGroundKm;
+                    newDist = Math.max(1.0, Math.min(1000.0, newDist));
+
+                    const activeRx = getActiveReceiver();
+                    const bearing = (glob.lat === activeRx.lat && glob.lon === activeRx.lon)
+                        ? 0
+                        : getBearing(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                    const dest = getDestination(glob.lat, glob.lon, newDist, bearing);
+
+                    activeRx.lat = dest.lat;
+                    activeRx.lon = dest.lon;
+                    document.getElementById('g_target_lat').value = dest.lat.toFixed(4);
+                    document.getElementById('g_target_lon').value = dest.lon.toFixed(4);
+
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                }
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                canvasState.mouseX = -9999;
+                canvasState.mouseY = -9999;
+                if (canvasState.hoveringBalloon || canvasState.hoveringGS) {
+                    canvasState.hoveringBalloon = false;
+                    canvasState.hoveringGS = false;
+                    const glob = appState.global_state;
+                    const activeRx = getActiveReceiver();
+                    const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                    const maxHorizonGroundKm = EARTH_RADIUS_KM * Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                    drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (draggedElement) {
+                    const wasDraggedGS = (draggedElement === 'ground_station');
+                    draggedElement = null;
+                    canvas.style.cursor = 'default';
+                    // Redraw to clear grab glows
+                    const glob = appState.global_state;
+                    const activeRx = getActiveReceiver();
+                    const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                    const maxHorizonGroundKm = EARTH_RADIUS_KM * Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                    drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+
+                    if (wasDraggedGS) {
+                        fetchReceiverElevation();
+                    }
+                }
+            });
+
+            // Touch event mappings for mobile pinch-to-zoom/panning
+            let touchStartDist = 0;
+            let touchStartZoom = 1.0;
+
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    canvas.dispatchEvent(mouseEvent);
+                } else if (e.touches.length === 2) {
+                    e.preventDefault();
+                    // Pinch initialization
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    touchStartDist = Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2));
+                    touchStartZoom = zoomLevel;
+                    draggedElement = 'zoom';
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 1 && draggedElement !== 'zoom') {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    canvas.dispatchEvent(mouseEvent);
+                } else if (e.touches.length === 2 && draggedElement === 'zoom') {
+                    e.preventDefault();
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    const dist = Math.sqrt(Math.pow(t2.clientX - t1.clientX, 2) + Math.pow(t2.clientY - t1.clientY, 2));
+
+                    if (touchStartDist > 0) {
+                        const factor = dist / touchStartDist;
+                        const newZoom = touchStartZoom * factor;
+
+                        if (newZoom >= 0.4 && newZoom <= 40) {
+                            // Zoom relative to midpoint
+                            const midX = (t1.clientX + t2.clientX) / 2;
+                            const midY = (t1.clientY + t2.clientY) / 2;
+                            const rect = canvas.getBoundingClientRect();
+                            const physMidX = (midX - rect.left) * (canvas.width / rect.width);
+                            const physMidY = (midY - rect.top) * (canvas.height / rect.height);
+
+                            const relativeZoomFactor = newZoom / zoomLevel;
+                            panOffset.x = physMidX - (physMidX - panOffset.x) * relativeZoomFactor;
+                            panOffset.y = physMidY - (physMidY - panOffset.y) * relativeZoomFactor;
+                            zoomLevel = newZoom;
+
+                            const glob = appState.global_state;
+                            const activeRx = getActiveReceiver();
+                            const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                            const maxHorizonGroundKm = EARTH_RADIUS_KM * Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                            drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+                        }
+                    }
+                }
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', () => {
+                const mouseEvent = new MouseEvent('mouseup', {});
+                window.dispatchEvent(mouseEvent);
+                touchStartDist = 0;
+            });
+        }
+
+        // --- Form Event Subscriptions ---
+        function setupEventListeners() {
+            // Global fields bindings
+            const bindGlobalNum = (id, key) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                        appState.global_state[key] = val;
+                        saveStateToStorage();
+                        calculateAndRender(true);
+                    }
+                });
+            };
+
+            bindGlobalNum('g_lat', 'lat');
+            bindGlobalNum('g_lon', 'lon');
+            bindGlobalNum('g_alt_km', 'alt_km');
+
+            // Active Receiver fields bindings
+            const bindActiveRxNum = (id, key) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                        const activeRx = getActiveReceiver();
+                        activeRx[key] = val;
+                        saveStateToStorage();
+                        calculateAndRender(true);
+                    }
+                });
+            };
+
+            bindActiveRxNum('g_target_lat', 'lat');
+            bindActiveRxNum('g_target_lon', 'lon');
+            bindActiveRxNum('g_rx_alt_m', 'alt_m');
+
+            // Receiver Select binding
+            document.getElementById('receiver-select').addEventListener('change', (e) => {
+                appState.global_state.active_receiver_id = e.target.value;
+                saveStateToStorage();
+                populateGlobalForm();
+                calculateAndRender(true);
+            });
+
+            // Active Profile selector binding
+            document.getElementById('profile-select').addEventListener('change', (e) => {
+                appState.active_profile_name = e.target.value;
+                saveStateToStorage();
+                populateActiveProfileForm();
+                calculateAndRender(true);
+            });
+
+            // Profile editing inputs bindings
+            const bindProfileNum = (id, key) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                        appState.profiles[appState.active_profile_name][key] = val;
+                        saveStateToStorage();
+                        calculateAndRender(true);
+                    }
+                });
+            };
+
+            bindProfileNum('p_f_mhz', 'f_mhz');
+            bindProfileNum('p_p_tx', 'p_tx');
+            bindProfileNum('p_g_tx', 'g_tx');
+            bindProfileNum('p_g_rx', 'g_rx');
+            bindProfileNum('p_rx_loss', 'rx_loss');
+            bindProfileNum('p_rtl_nf', 'rtl_nf');
+            bindProfileNum('p_sym_rate', 'sym_rate');
+            bindProfileNum('p_rrc_alpha', 'rrc_alpha');
+            bindProfileNum('p_impl_loss', 'impl_loss');
+            bindProfileNum('p_phase_jitter', 'phase_jitter');
+
+            document.getElementById('p_coding').addEventListener('change', (e) => {
+                onCodingChange();
+            });
+
+            document.getElementById('p_modulation').addEventListener('change', (e) => {
+                appState.profiles[appState.active_profile_name].modulation = e.target.value;
+                saveStateToStorage();
+                calculateAndRender(true);
+            });
+
+            document.getElementById('p_target_type').addEventListener('change', (e) => {
+                const type = e.target.value;
+                appState.profiles[appState.active_profile_name].target_type = type;
+
+                const valInput = document.getElementById('p_target_value');
+                const presetSelect = document.getElementById('p_target_value_preset');
+                if (type === 'BER') {
+                    valInput.value = '1e-5';
+                    presetSelect.value = '1e-5';
+                    appState.profiles[appState.active_profile_name].target_value = 1e-5;
+                } else {
+                    valInput.value = '1e-3';
+                    presetSelect.value = '1e-3';
+                    appState.profiles[appState.active_profile_name].target_value = 1e-3;
+                }
+                saveStateToStorage();
+                calculateAndRender(true);
+            });
+
+            document.getElementById('p_target_value_preset').addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val !== 'custom') {
+                    const numVal = parseFloat(val);
+                    document.getElementById('p_target_value').value = val;
+                    appState.profiles[appState.active_profile_name].target_value = numVal;
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                }
+            });
+
+            document.getElementById('p_target_value').addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (!isNaN(val) && val > 0) {
+                    appState.profiles[appState.active_profile_name].target_value = val;
+
+                    const presetSelect = document.getElementById('p_target_value_preset');
+                    const valStr = String(val);
+                    let found = false;
+                    for (let i = 0; i < presetSelect.options.length; i++) {
+                        if (presetSelect.options[i].value === valStr) {
+                            presetSelect.value = valStr;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        presetSelect.value = 'custom';
+                    }
+
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                }
+            });
+
+            const csvInput = document.getElementById('csv-files-input');
+            if (csvInput) {
+                csvInput.addEventListener('change', (e) => {
+                    const files = e.target.files;
+                    if (files.length === 0) return;
+
+                    let berText = null;
+                    let ferText = null;
+                    let loadedCount = 0;
+
+                    Array.from(files).forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            const text = event.target.result;
+                            if (file.name.toLowerCase().includes('ber')) {
+                                berText = text;
+                            } else if (file.name.toLowerCase().includes('fer')) {
+                                ferText = text;
+                            }
+                            loadedCount++;
+                            if (loadedCount === files.length || (berText && ferText)) {
+                                if (berText && ferText) {
+                                    localStorage.setItem('hab_ber_csv', berText);
+                                    localStorage.setItem('hab_fer_csv', ferText);
+                                    processCSVTexts(berText, ferText);
+                                    const statusEl = document.getElementById('csv-status');
+                                    statusEl.innerText = "✓ CSV files loaded successfully from local upload.";
+                                    statusEl.style.color = "var(--success-color)";
+                                    document.getElementById('csv-upload-container').style.display = "none";
+                                } else {
+                                    alert("Please select both ber.csv and fer.csv files.");
+                                }
+                            }
+                        };
+                        reader.readAsText(file);
+                    });
+                });
+            }
+
+            document.getElementById('p_show_footprint').addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                appState.profiles[appState.active_profile_name].show_footprint = checked;
+                document.getElementById('hpbw-input-container').style.display = checked ? 'block' : 'none';
+                saveStateToStorage();
+                calculateAndRender(true);
+            });
+
+            document.getElementById('p_tx_hpbw').addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                if (!isNaN(val)) {
+                    if (val < 1) val = 1;
+                    if (val > 179) val = 179;
+                    appState.profiles[appState.active_profile_name].tx_hpbw = val;
+                    // Automatically double the FNBW (capped at 179)
+                    let doubleFnbw = Math.min(179, val * 2);
+                    appState.profiles[appState.active_profile_name].tx_fnbw = doubleFnbw;
+                    document.getElementById('p_tx_fnbw').value = doubleFnbw;
+
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                }
+            });
+
+            document.getElementById('p_tx_fnbw').addEventListener('input', (e) => {
+                let val = parseFloat(e.target.value);
+                if (!isNaN(val)) {
+                    if (val < 1) val = 1;
+                    if (val > 179) val = 179;
+                    appState.profiles[appState.active_profile_name].tx_fnbw = val;
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                }
+            });
+
+            const bindFootprintCheckbox = (id, key) => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    appState.profiles[appState.active_profile_name][key] = e.target.checked;
+                    saveStateToStorage();
+                    calculateAndRender(true);
+                });
+            };
+
+            bindFootprintCheckbox('p_show_hpbw_ring', 'show_hpbw_ring');
+            bindFootprintCheckbox('p_show_zero_dbi_ring', 'show_zero_dbi_ring');
+            bindFootprintCheckbox('p_show_fnbw_ring', 'show_fnbw_ring');
+
+            // Window resize handler to trigger canvas redraw
+            window.addEventListener('resize', () => {
+                const activePanel = document.querySelector('.view-panel.active');
+                if (activePanel && activePanel.id === 'profile-view') {
+                    const glob = appState.global_state;
+                    const activeRx = getActiveReceiver();
+                    const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                    const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                    const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+                    drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+                }
+            });
+        }
+
+        // --- Map PNG Export ---
+        async function exportMapPNG() {
+            const btn = document.getElementById('btn-export-map-png');
+            const origHTML = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Generating…'; }
+            const glob = appState.global_state;
+            const activeRx = getActiveReceiver();
+
+            const profileNames = Object.keys(appState.profiles).filter(n => !appState.profiles[n].hidden);
+            if (profileNames.length === 0) {
+                alert("No enabled profiles to export.");
+                return;
+            }
+
+            // Canvas dimensions (1080p: 1920 × 1080)
+            const LEGEND_WIDTH = 380;
+            const MAP_W = 1540;
+            const MAP_H = 1080;
+            const TOTAL_W = MAP_W + LEGEND_WIDTH;
+            const TOTAL_H = MAP_H;
+            const S = MAP_H / 700; // scale factor for fonts, sizes, spacing
+
+            const offscreen = document.createElement('canvas');
+            offscreen.width = TOTAL_W;
+            offscreen.height = TOTAL_H;
+            const ctx = offscreen.getContext('2d');
+
+            // ---- Compute geo bounds ----
+            // Gather all relevant lat/lon points: balloon, all receivers
+            const allLats = [glob.lat, ...glob.receivers.map(r => r.lat)];
+            const allLons = [glob.lon, ...glob.receivers.map(r => r.lon)];
+
+            // Also include coverage circle extents
+            const altKm = parseFloat(glob.alt_km);
+            const hAngleBalloon = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + altKm));
+            const hAngleRx = 0;
+            const maxHorizonGroundKm = EARTH_RADIUS_KM * (hAngleBalloon + hAngleRx);
+
+            // Maximum radius to display (horizon or max RF range, whichever is larger)
+            let maxRadiusKm = maxHorizonGroundKm;
+            profileNames.forEach(name => {
+                const prof = appState.profiles[name];
+                const rxDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                const res = calculateLink(prof, glob, rxDist);
+                const usableRadius = Math.min(res.max_rf_range_km, maxHorizonGroundKm);
+                if (usableRadius > maxRadiusKm) maxRadiusKm = usableRadius;
+            });
+
+            // Padding factor: add 20% around the main content
+            const PAD_FACTOR = 1.35;
+            const viewRadiusKm = maxRadiusKm * PAD_FACTOR;
+
+            // Approximate degrees per km at the balloon's latitude
+            const latDegPerKm = 1.0 / 111.32;
+            const lonDegPerKm = 1.0 / (111.32 * Math.cos(glob.lat * Math.PI / 180));
+
+            const latSpan = viewRadiusKm * latDegPerKm * 2;
+            const lonSpan = viewRadiusKm * lonDegPerKm * 2;
+
+            const minLat = glob.lat - viewRadiusKm * latDegPerKm;
+            const maxLat = glob.lat + viewRadiusKm * latDegPerKm;
+            const minLon = glob.lon - viewRadiusKm * lonDegPerKm;
+            const maxLon = glob.lon + viewRadiusKm * lonDegPerKm;
+
+            // Projection helpers
+            const project = (lat, lon) => {
+                const x = MAP_W * (lon - minLon) / (maxLon - minLon);
+                const y = MAP_H * (maxLat - lat) / (maxLat - minLat);
+                return { x, y };
+            };
+
+            // Convert km radius to pixels
+            const kmToPixels = (km) => {
+                const pixPerDegLat = MAP_H / latSpan;
+                return km * latDegPerKm * pixPerDegLat;
+            };
+
+            // ---- Draw MAP area background ----
+            // First fill a fallback gradient (also drawn behind tiles for any gaps)
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, MAP_H);
+            bgGrad.addColorStop(0, '#e8f4fd');
+            bgGrad.addColorStop(1, '#dbeafe');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, MAP_W, MAP_H);
+
+            // ---- Load OSM tile background (CORS-enabled) ----
+            const _osmZoom = Math.max(4, Math.min(10, Math.round(Math.log2(MAP_W / lonSpan * 360 / 256 * 0.55))));
+            const _osmN = Math.pow(2, _osmZoom);
+            const _lonToTX = (lon) => Math.floor((lon + 180) / 360 * _osmN);
+            const _latToTY = (lat) => {
+                const lr = Math.max(-85.05, Math.min(85.05, lat)) * Math.PI / 180;
+                return Math.floor((1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * _osmN);
+            };
+            const _txMin = _lonToTX(minLon), _txMax = _lonToTX(maxLon);
+            const _tyMin = _latToTY(maxLat), _tyMax = _latToTY(minLat);
+            const _subs = ['a', 'b', 'c'];
+            const _tileJobs = [];
+            for (let tx = _txMin; tx <= _txMax; tx++)
+                for (let ty = _tyMin; ty <= _tyMax; ty++)
+                    _tileJobs.push(new Promise(res => {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = () => res({ img, tx, ty });
+                        img.onerror = () => res({ img: null, tx, ty });
+                        setTimeout(() => res({ img: null, tx, ty }), 7000);
+                        img.src = `https://${_subs[(tx + ty) % 3]}.tile.openstreetmap.org/${_osmZoom}/${tx}/${ty}.png`;
+                    }));
+            const _tiles = await Promise.all(_tileJobs);
+
+            // Draw tiles using OSM Mercator → canvas mapping
+            // OSM tile top Mercator value = π*(1 - 2*ty/n), same convention as latToMerc
+            _tiles.forEach(({ img, tx, ty }) => {
+                if (!img) return;
+                const x0 = MAP_W * (tx / _osmN * 360 - 180 - minLon) / lonSpan;
+                const x1 = MAP_W * ((tx + 1) / _osmN * 360 - 180 - minLon) / lonSpan;
+                // Convert OSM tile row to lat then to our equirectangular y
+                const _tileLatTop = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / _osmN))) * 180 / Math.PI;
+                const _tileLatBot = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + 1) / _osmN))) * 180 / Math.PI;
+                const y0 = MAP_H * (maxLat - _tileLatTop) / latSpan;
+                const y1 = MAP_H * (maxLat - _tileLatBot) / latSpan;
+                ctx.drawImage(img, x0, y0, x1 - x0, y1 - y0);
+            });
+
+            // Semi-transparent white overlay for label readability
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(0, 0, MAP_W, MAP_H);
+
+            // OSM attribution strip
+            ctx.fillStyle = 'rgba(255,255,255,0.72)';
+            ctx.fillRect(0, MAP_H - Math.round(18 * S), MAP_W, Math.round(18 * S));
+            ctx.fillStyle = '#475569';
+            ctx.font = `${Math.round(8 * S)}px sans-serif`;
+            ctx.fillText('© OpenStreetMap contributors', 4, MAP_H - 4);
+
+            // Draw a subtle lat/lon grid
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+            ctx.lineWidth = 0.8;
+            const gridStepLat = latSpan > 5 ? 2 : latSpan > 2 ? 1 : 0.5;
+            const gridStepLon = lonSpan > 5 ? 2 : lonSpan > 2 ? 1 : 0.5;
+            const startGridLat = Math.ceil(minLat / gridStepLat) * gridStepLat;
+            const startGridLon = Math.ceil(minLon / gridStepLon) * gridStepLon;
+
+            ctx.setLineDash([Math.round(3 * S), Math.round(5 * S)]);
+            for (let lat = startGridLat; lat <= maxLat; lat += gridStepLat) {
+                const { y } = project(lat, minLon);
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(MAP_W, y);
+                ctx.stroke();
+                // Label
+                ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
+                ctx.font = `${Math.round(9 * S)}px sans-serif`;
+                ctx.fillText(lat.toFixed(1) + '°N', 3, y - 2);
+            }
+            for (let lon = startGridLon; lon <= maxLon; lon += gridStepLon) {
+                const { x } = project(minLat, lon);
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, MAP_H);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(100, 116, 139, 0.7)';
+                ctx.font = `${Math.round(9 * S)}px sans-serif`;
+                ctx.fillText(lon.toFixed(1) + '°E', x + 2, MAP_H - Math.round(18 * S));
+            }
+            ctx.setLineDash([]);
+
+            // ---- Draw horizon circle ----
+            const balloonPos = project(glob.lat, glob.lon);
+            const horizonPx = kmToPixels(maxHorizonGroundKm);
+
+            ctx.beginPath();
+            ctx.arc(balloonPos.x, balloonPos.y, horizonPx, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(220, 38, 38, 0.5)';
+            ctx.lineWidth = Math.round(1.5 * S);
+            ctx.setLineDash([Math.round(6 * S), Math.round(5 * S)]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // ---- Draw profile coverage circles ----
+            // Sort by radius descending (largest first) so smaller ones appear on top
+            const circleData = [];
+            profileNames.forEach((name, idx) => {
+                const prof = appState.profiles[name];
+                const rxDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                const res = calculateLink(prof, glob, rxDist);
+                const color = LINK_COLORS[idx % LINK_COLORS.length];
+                const usableRadiusKm = Math.min(res.max_rf_range_km, maxHorizonGroundKm);
+                if (usableRadiusKm > 0) {
+                    circleData.push({ name, color, radiusKm: usableRadiusKm });
+                }
+            });
+
+            circleData.sort((a, b) => b.radiusKm - a.radiusKm);
+            circleData.forEach((c, i) => {
+                const r = kmToPixels(c.radiusKm - i * 0.3);
+                // Parse hex color to rgba
+                const hex = c.color.replace('#', '');
+                const rr = parseInt(hex.substring(0, 2), 16);
+                const gg = parseInt(hex.substring(2, 4), 16);
+                const bb = parseInt(hex.substring(4, 6), 16);
+
+                ctx.beginPath();
+                ctx.arc(balloonPos.x, balloonPos.y, Math.max(r, 1), 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(${rr},${gg},${bb},0.06)`;
+                ctx.fill();
+                ctx.strokeStyle = `rgba(${rr},${gg},${bb},0.7)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Label on the circle edge (right side)
+                const labelX = balloonPos.x + r + 4;
+                const labelY = balloonPos.y;
+                if (labelX < MAP_W - 10) {
+                    ctx.fillStyle = c.color;
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.fillText(c.name, labelX, labelY + 3);
+                    ctx.fillStyle = '#475569';
+                    ctx.font = '9px sans-serif';
+                    ctx.fillText(c.radiusKm.toFixed(1) + ' km', labelX, labelY + 13);
+                }
+            });
+
+            // ---- Draw link lines to each receiver ----
+            glob.receivers.forEach(rx => {
+                const rxDist = haversine(glob.lat, glob.lon, rx.lat, rx.lon);
+                const isBlocked = rxDist > maxHorizonGroundKm;
+                const rxPos = project(rx.lat, rx.lon);
+
+                ctx.beginPath();
+                ctx.moveTo(balloonPos.x, balloonPos.y);
+                ctx.lineTo(rxPos.x, rxPos.y);
+                ctx.strokeStyle = isBlocked ? '#dc2626' : '#16a34a';
+                ctx.lineWidth = rx.id === glob.active_receiver_id ? 2.5 : 1.5;
+                ctx.setLineDash(isBlocked ? [5, 5] : []);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            });
+
+            // ---- Draw receiver markers ----
+            glob.receivers.forEach(rx => {
+                const rxPos = project(rx.lat, rx.lon);
+                const isActive = rx.id === glob.active_receiver_id;
+
+                ctx.beginPath();
+                ctx.arc(rxPos.x, rxPos.y, isActive ? Math.round(8 * S) : Math.round(6 * S), 0, 2 * Math.PI);
+                ctx.fillStyle = isActive ? '#ea580c' : '#2563eb';
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = Math.round(1.5 * S);
+                ctx.stroke();
+
+                // Receiver label
+                ctx.fillStyle = '#0f172a';
+                ctx.font = `bold ${Math.round(10 * S)}px sans-serif`;
+                ctx.fillText(rx.name, rxPos.x + Math.round(10 * S), rxPos.y - Math.round(4 * S));
+                ctx.fillStyle = '#475569';
+                ctx.font = `${Math.round(9 * S)}px sans-serif`;
+                const rxDist = haversine(glob.lat, glob.lon, rx.lat, rx.lon);
+                ctx.fillText(`${rxDist.toFixed(1)} km`, rxPos.x + Math.round(10 * S), rxPos.y + Math.round(7 * S));
+            });
+
+            // ---- Draw balloon marker ----
+            const bR = Math.round(10 * S);
+            ctx.beginPath();
+            ctx.arc(balloonPos.x, balloonPos.y, bR, 0, 2 * Math.PI);
+            ctx.fillStyle = '#dc2626';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.round(2 * S);
+            ctx.stroke();
+
+            // Balloon cross-hair lines
+            ctx.strokeStyle = 'rgba(220, 38, 38, 0.5)';
+            ctx.lineWidth = Math.round(1.5 * S);
+            const bCross = Math.round(16 * S);
+            ctx.beginPath();
+            ctx.moveTo(balloonPos.x - bCross, balloonPos.y);
+            ctx.lineTo(balloonPos.x + bCross, balloonPos.y);
+            ctx.moveTo(balloonPos.x, balloonPos.y - bCross);
+            ctx.lineTo(balloonPos.x, balloonPos.y + bCross);
+            ctx.stroke();
+
+            // Balloon label
+            ctx.fillStyle = '#dc2626';
+            ctx.font = `bold ${Math.round(11 * S)}px sans-serif`;
+            ctx.fillText(`HAB @ ${altKm.toFixed(1)} km`, balloonPos.x + Math.round(13 * S), balloonPos.y - Math.round(4 * S));
+            ctx.fillStyle = '#475569';
+            ctx.font = `${Math.round(9 * S)}px sans-serif`;
+            ctx.fillText(`${glob.lat.toFixed(3)}°N, ${glob.lon.toFixed(3)}°E`, balloonPos.x + Math.round(13 * S), balloonPos.y + Math.round(8 * S));
+
+            // ---- Horizon label ----
+            ctx.fillStyle = 'rgba(185, 28, 28, 0.8)';
+            ctx.font = `bold ${Math.round(9 * S)}px sans-serif`;
+            ctx.fillText(`Horizon: ${maxHorizonGroundKm.toFixed(1)} km`, balloonPos.x + horizonPx * 0.72, balloonPos.y - horizonPx * 0.72);
+
+            // ---- Map title ----
+            const titleH = Math.round(28 * S);
+            ctx.fillStyle = 'rgba(15,23,42,0.7)';
+            ctx.fillRect(0, 0, MAP_W, titleH);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(13 * S)}px sans-serif`;
+            ctx.fillText(`Coverage Map  -  Alt: ${altKm.toFixed(1)} km  |  Horizon: ${maxHorizonGroundKm.toFixed(1)} km`, Math.round(10 * S), Math.round(18 * S));
+
+            // ---- Scale bar ----
+            const scaleKm = viewRadiusKm > 500 ? 500 : viewRadiusKm > 200 ? 200 : viewRadiusKm > 100 ? 100 : viewRadiusKm > 50 ? 50 : 20;
+            const scalePx = kmToPixels(scaleKm);
+            const sbX = Math.round(14 * S), sbY = MAP_H - Math.round(20 * S);
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.fillRect(sbX - 2, sbY - Math.round(14 * S), scalePx + 4, Math.round(18 * S));
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = Math.round(2 * S);
+            ctx.beginPath();
+            ctx.moveTo(sbX, sbY);
+            ctx.lineTo(sbX + scalePx, sbY);
+            ctx.stroke();
+            // Tick marks
+            ctx.beginPath();
+            ctx.moveTo(sbX, sbY - Math.round(4 * S));
+            ctx.lineTo(sbX, sbY + Math.round(4 * S));
+            ctx.moveTo(sbX + scalePx, sbY - Math.round(4 * S));
+            ctx.lineTo(sbX + scalePx, sbY + Math.round(4 * S));
+            ctx.stroke();
+            ctx.fillStyle = '#0f172a';
+            ctx.font = `bold ${Math.round(9 * S)}px sans-serif`;
+            ctx.fillText(`${scaleKm} km`, sbX + scalePx / 2 - Math.round(12 * S), sbY - Math.round(4 * S));
+
+            // ============================================================
+            // ---- LEGEND PANEL (right side) ----
+            // ============================================================
+            const lx0 = MAP_W;
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(lx0, 0, LEGEND_WIDTH, TOTAL_H);
+
+            // Legend border line
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(lx0, 0);
+            ctx.lineTo(lx0, TOTAL_H);
+            ctx.stroke();
+
+            // Legend header
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(lx0, 0, LEGEND_WIDTH, Math.round(36 * S));
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.round(13 * S)}px sans-serif`;
+            ctx.fillText('Link Profiles', lx0 + Math.round(12 * S), Math.round(22 * S));
+
+            let lY = Math.round(50 * S);
+            const lxPad = lx0 + Math.round(14 * S);
+            const lxRight = lx0 + LEGEND_WIDTH - Math.round(14 * S);
+
+            // Summary row
+            ctx.fillStyle = '#475569';
+            ctx.font = `${Math.round(10 * S)}px sans-serif`;
+            const activeRxObj = getActiveReceiver();
+            const activeRxDist = haversine(glob.lat, glob.lon, activeRxObj.lat, activeRxObj.lon);
+
+            ctx.fillText(`Active Rx: ${activeRxObj.name}`, lxPad, lY);
+            lY += Math.round(14 * S);
+            ctx.fillText(`Distance: ${activeRxDist.toFixed(1)} km  |  Alt: ${altKm.toFixed(1)} km`, lxPad, lY);
+            lY += Math.round(14 * S);
+
+            const elevAngle = Math.atan2(
+                (EARTH_RADIUS_KM + altKm) * Math.cos(activeRxDist / EARTH_RADIUS_KM) - EARTH_RADIUS_KM,
+                (EARTH_RADIUS_KM + altKm) * Math.sin(activeRxDist / EARTH_RADIUS_KM)
+            ) * 180 / Math.PI;
+            ctx.fillText(`Elevation: ${elevAngle.toFixed(1)}°  |  Horizon: ${maxHorizonGroundKm.toFixed(1)} km`, lxPad, lY);
+            lY += Math.round(20 * S);
+
+            // Separator
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(lxPad, lY);
+            ctx.lineTo(lxRight, lY);
+            ctx.stroke();
+            lY += Math.round(12 * S);
+
+            profileNames.forEach((name, idx) => {
+                const prof = appState.profiles[name];
+                const color = LINK_COLORS[idx % LINK_COLORS.length];
+                const res = calculateLink(prof, glob, activeRxDist);
+
+                const isBlocked = activeRxDist > maxHorizonGroundKm;
+                let statusText, statusColor, statusBg;
+                if (isBlocked) {
+                    statusText = 'BLOCKED';
+                    statusColor = '#b91c1c';
+                    statusBg = '#fee2e2';
+                } else if (res.target_margin >= 0) {
+                    statusText = `LOCK +${res.target_margin.toFixed(1)} dB`;
+                    statusColor = '#15803d';
+                    statusBg = '#dcfce7';
+                } else {
+                    statusText = `FAIL ${res.target_margin.toFixed(1)} dB`;
+                    statusColor = '#b45309';
+                    statusBg = '#ffedd5';
+                }
+
+                // Profile color swatch + name
+                ctx.fillStyle = color;
+                ctx.fillRect(lxPad, lY - Math.round(10 * S), Math.round(5 * S), Math.round(16 * S));
+
+                ctx.fillStyle = color;
+                ctx.font = `bold ${Math.round(11 * S)}px sans-serif`;
+                ctx.fillText(name, lxPad + Math.round(9 * S), lY);
+
+                // Status badge
+                ctx.font = `bold ${Math.round(8.5 * S)}px sans-serif`;
+                const badgeW = ctx.measureText(statusText).width + Math.round(10 * S);
+                const badgeX = lxRight - badgeW;
+                ctx.fillStyle = statusBg;
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(badgeX, lY - Math.round(10 * S), badgeW, Math.round(14 * S), 4);
+                } else {
+                    ctx.rect(badgeX, lY - Math.round(10 * S), badgeW, Math.round(14 * S));
+                }
+                ctx.fill();
+                ctx.fillStyle = statusColor;
+                ctx.fillText(statusText, badgeX + Math.round(5 * S), lY);
+
+                lY += Math.round(18 * S);
+
+                // Parameter rows
+                ctx.fillStyle = '#475569';
+                ctx.font = `${Math.round(9.5 * S)}px sans-serif`;
+
+                const paramRows = [
+                    [`Freq: ${prof.f_mhz} MHz`, `Tx Power: ${prof.p_tx} dBm`],
+                    [`Tx Ant: ${prof.g_tx} dBi`, `Rx Ant: ${prof.g_rx} dBi`],
+                    [`Mod: ${prof.modulation || 'QPSK'}`, `Coding: ${prof.coding || 'Concat 1/2 D4'}`],
+                    [`Sym Rate: ${prof.sym_rate} kS/s`, `NF: ${prof.rtl_nf} dB`],
+                ];
+                paramRows.forEach(([left, right]) => {
+                    ctx.fillText(left, lxPad + Math.round(9 * S), lY);
+                    ctx.fillText(right, lxPad + LEGEND_WIDTH / 2 - Math.round(10 * S), lY);
+                    lY += Math.round(13 * S);
+                });
+
+                // Key metrics
+                ctx.fillStyle = '#1e40af';
+                ctx.font = `bold ${Math.round(9.5 * S)}px sans-serif`;
+                ctx.fillText(`Max Range: ${res.max_rf_range_km > 10000 ? '>10k' : res.max_rf_range_km.toFixed(1)} km`, lxPad + Math.round(9 * S), lY);
+                ctx.fillText(`Data Rate: ${res.usable_kbps.toFixed(1)} kbps`, lxPad + LEGEND_WIDTH / 2 - Math.round(10 * S), lY);
+                lY += Math.round(14 * S);
+
+                ctx.fillStyle = '#475569';
+                ctx.font = `${Math.round(9 * S)}px sans-serif`;
+                ctx.fillText(`SNR: req ${res.total_threshold.toFixed(1)} dB | proj ${res.target_snr.toFixed(1)} dB | atmos -${res.atmos_loss.toFixed(2)} dB`, lxPad + Math.round(9 * S), lY);
+                lY += Math.round(10 * S);
+
+                // Separator between profiles
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(lxPad, lY);
+                ctx.lineTo(lxRight, lY);
+                ctx.stroke();
+                lY += Math.round(12 * S);
+            });
+
+            // ---- Legend map key ----
+            // Pin key to start no earlier than ~160px (scaled) from bottom
+            lY = Math.max(lY + Math.round(6 * S), TOTAL_H - Math.round(110 * S));
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(lxPad, lY);
+            ctx.lineTo(lxRight, lY);
+            ctx.stroke();
+            lY += Math.round(14 * S);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = `bold ${Math.round(9 * S)}px sans-serif`;
+            ctx.fillText('MAP KEY', lxPad, lY);
+            lY += Math.round(18 * S);
+
+            const mapKeyItems = [
+                { color: '#dc2626', dash: true, label: 'Geometric Horizon' },
+                { color: '#dc2626', dot: true, label: 'HAB Balloon' },
+                { color: '#ea580c', dot: true, label: 'Active Receiver' },
+                { color: '#2563eb', dot: true, label: 'Other Receiver(s)' },
+            ];
+            mapKeyItems.forEach(item => {
+                const glyphCy = lY - Math.round(6 * S);   // glyph centre above text baseline
+                const dotR = Math.round(5 * S);
+                const lineEnd = Math.round(22 * S);
+                if (item.dot) {
+                    ctx.beginPath();
+                    ctx.arc(lxPad + dotR + 2, glyphCy, dotR, 0, 2 * Math.PI);
+                    ctx.fillStyle = item.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = Math.round(1 * S);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.setLineDash(item.dash ? [Math.round(4 * S), Math.round(3 * S)] : []);
+                    ctx.moveTo(lxPad, glyphCy);
+                    ctx.lineTo(lxPad + lineEnd, glyphCy);
+                    ctx.strokeStyle = item.color;
+                    ctx.lineWidth = Math.round(2 * S);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.fillStyle = '#475569';
+                ctx.font = `${Math.round(9.5 * S)}px sans-serif`;
+                ctx.fillText(item.label, lxPad + lineEnd + Math.round(4 * S), lY);
+                lY += Math.round(20 * S);
+            });
+
+            // ---- Timestamp — right-aligned at the very bottom-right of the legend ----
+            const now = new Date();
+            const stamp = `Generated: ${now.toISOString().slice(0, 19).replace('T', ' ')} UTC`;
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.85)';
+            ctx.font = '8px sans-serif';
+            const stampW = ctx.measureText(stamp).width;
+            ctx.fillText(stamp, lx0 + LEGEND_WIDTH - stampW - 8, TOTAL_H - 5);
+
+            // ---- Download ----
+            const filename = `hab_coverage_${now.toISOString().slice(0, 16).replace(/[-:T]/g, '')}.png`;
+            const dataURL = offscreen.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+        }
+
+        // --- Navigation Tabs ---
+        function switchVisualTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+
+            document.getElementById(`tab-btn-${tabName}`).classList.add('active');
+            document.getElementById(`${tabName}-view`).classList.add('active');
+
+            if (tabName === 'map') {
+                setTimeout(() => map.invalidateSize(), 50);
+            } else if (tabName === 'profile') {
+                setTimeout(() => {
+                    if (!hasAutoFitted) {
+                        autoFitCanvas();
+                        hasAutoFitted = true;
+                    } else {
+                        const glob = appState.global_state;
+                        const activeRx = getActiveReceiver();
+                        const targetDist = haversine(glob.lat, glob.lon, activeRx.lat, activeRx.lon);
+                        const horizonAngle = Math.acos(EARTH_RADIUS_KM / (EARTH_RADIUS_KM + glob.alt_km));
+                        const maxHorizonGroundKm = EARTH_RADIUS_KM * horizonAngle;
+                        drawCurvatureProfile(glob, targetDist, maxHorizonGroundKm);
+                    }
+                }, 50);
+            }
+        }
+
+        // --- Main Setup ---
+        window.addEventListener('DOMContentLoaded', () => {
+            loadStateFromStorage();
+
+            // Leaflet Map Initialization with Standard OSM Tile Layer
+            map = L.map('map', {
+                center: [appState.global_state.lat, appState.global_state.lon],
+                zoom: 6,
+                zoomControl: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Create Clean Pin Markers Icons
+            const balloonIcon = L.divIcon({
+                className: 'leaflet-balloon-icon',
+                html: `
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="#dc2626">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                `,
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            const rxIcon = L.divIcon({
+                className: 'leaflet-rx-icon',
+                html: `
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="#2563eb">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                `,
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            // Instantiate markers
+            balloonMarker = L.marker([appState.global_state.lat, appState.global_state.lon], {
+                icon: balloonIcon,
+                draggable: true
+            }).addTo(map);
+
+            // Drag listeners
+            balloonMarker.on('drag', (e) => {
+                const latLng = e.target.getLatLng();
+                appState.global_state.lat = latLng.lat;
+                appState.global_state.lon = latLng.lng;
+                document.getElementById('g_lat').value = latLng.lat.toFixed(4);
+                document.getElementById('g_lon').value = latLng.lng.toFixed(4);
+                saveStateToStorage();
+                calculateAndRender(false); // don't redraw markers positions during active drag
+            });
+
+            balloonMarker.on('dragend', () => {
+                calculateAndRender(true);
+            });
+
+            // Form data populating
+            populateGlobalForm();
+            updateProfileSelectDropdown();
+            populateActiveProfileForm();
+            setupEventListeners();
+            setupCanvasDrag(); // Initialize canvas interactive dragging
+
+            // Load CSV data dynamically
+            initCSVData();
+        });
+    </script>
+</body>
+
+</html>
