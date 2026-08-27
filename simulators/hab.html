@@ -673,6 +673,16 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label for="p_frame_size">AOS Frame Size (bytes)</label>
+                            <input type="number" id="p_frame_size" step="1" min="11">
+                        </div>
+                        <div class="form-group">
+                            <label for="p_aos_overhead">AOS Overhead (bytes)</label>
+                            <input type="number" id="p_aos_overhead" step="1" min="0" value="10">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
                             <label for="p_coding">Coding</label>
                             <select id="p_coding">
                             </select>
@@ -893,6 +903,10 @@
         const CCSDS_EB_N0 = { "1/2": 2.6, "2/3": 3.5, "3/4": 4.1, "5/6": 4.8, "7/8": 5.4 };
         const PUNCTURE_MULTIPLIER = { "1/2": 0.5, "2/3": 2.0 / 3.0, "3/4": 0.75, "5/6": 5.0 / 6.0, "7/8": 0.875 };
 
+        // CCSDS AOS transfer frame overhead: 6-byte primary header + 4-byte FECF = 10 bytes per frame
+        const AOS_FRAME_OVERHEAD_BYTES = 10;
+        const DEFAULT_AOS_FRAME_SIZE = 1024;
+
         // Simple clean colors to cycle through for link configurations
         const LINK_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#7c3aed", "#db2777", "#0891b2", "#dc2626"];
 
@@ -912,6 +926,7 @@
                     f_mhz: 435.0, p_tx: 26.0, g_tx: 0.0, g_rx: 5.0, rx_loss: 3.0,
                     sym_rate: 100.0, rrc_alpha: 0.25, rtl_nf: 2.0, phase_jitter: 0.0,
                     coding: "Concat 1/2 D4", modulation: "QPSK", target_type: "BER", target_value: 1e-5, impl_loss: 1.5,
+                    frame_size: 1024, aos_overhead: 10,
                     show_footprint: false, tx_hpbw: 60, tx_fnbw: 120,
                     show_hpbw_ring: true, show_zero_dbi_ring: true, show_fnbw_ring: true
                 },
@@ -919,6 +934,7 @@
                     f_mhz: 145.0, p_tx: 20.0, g_tx: 0.0, g_rx: 3.0, rx_loss: 1.5,
                     sym_rate: 20.0, rrc_alpha: 0.50, rtl_nf: 3.0, phase_jitter: 0.0,
                     coding: "Concat 1/2 D4", modulation: "QPSK", target_type: "BER", target_value: 1e-5, impl_loss: 1.0,
+                    frame_size: 1024, aos_overhead: 10,
                     show_footprint: false, tx_hpbw: 60, tx_fnbw: 120,
                     show_hpbw_ring: true, show_zero_dbi_ring: true, show_fnbw_ring: true
                 }
@@ -932,7 +948,7 @@
         let codingToModulations = {};
         let allCodings = [];
 
-        const DEFAULT_CODINGS = ["Concat 1/2 D4", "Concat 2/3 D4", "Concat 3/4 D4", "RS Depth 4", "Uncoded"];
+        const DEFAULT_CODINGS = ["Concat 1/2 D4", "Concat 2/3 D4", "Concat 3/4 D4", "RS Depth 4", "7/8 LDPC", "Uncoded"];
         const DEFAULT_MODULATIONS = ["BPSK", "QPSK", "8PSK", "16APSK", "16QAM"];
 
         function parseCSV(text) {
@@ -1048,6 +1064,11 @@
                 return a.localeCompare(b);
             });
 
+            // Add hardcoded FEC options not present in CSV (e.g. 7/8 LDPC, not yet simulated)
+            if (!allCodings.includes("7/8 LDPC")) {
+                allCodings.push("7/8 LDPC");
+            }
+
             updateCodingSelectDropdown();
             updateModulationSelectDropdown();
         }
@@ -1162,6 +1183,8 @@
                     let codingRate = 1.0;
                     if (coding.includes("Uncoded")) {
                         codingRate = 1.0;
+                    } else if (coding.includes("LDPC")) {
+                        codingRate = 7 / 8;
                     } else if (coding.includes("Concat")) {
                         const match = coding.match(/Concat\s+(\d+)\/(\d+)/);
                         const inner = match ? (parseInt(match[1]) / parseInt(match[2])) : 0.5;
@@ -1172,7 +1195,10 @@
 
                     // Look up Eb/N0 Required
                     let ebN0Req = 0;
-                    if (berData && ferData) {
+                    if (coding.includes("LDPC")) {
+                        // 7/8 LDPC not yet simulated - hardcoded required SNR for lossless decode
+                        ebN0Req = 4.5;
+                    } else if (berData && ferData) {
                         const colName = getCSVColumnName(coding, modulation);
                         const csvRows = targetType === "BER" ? berData : ferData;
                         const req = getRequiredEbN0(csvRows, colName, targetValue);
@@ -1214,8 +1240,11 @@
                     let selectedRs = Math.min(maxRs, maxSymRateLimit);
                     if (selectedRs < 0.1) return; // Cannot close link
 
-                    // Calculate actual data rate in kbps
-                    const kbps = selectedRs * m * codingRate;
+                    // Calculate actual data rate in kbps (after CCSDS AOS frame overhead)
+                    const frameSize = parseFloat(activeProfile.frame_size) || DEFAULT_AOS_FRAME_SIZE;
+                    const aosOverhead = parseFloat(activeProfile.aos_overhead) || AOS_FRAME_OVERHEAD_BYTES;
+                    const aosEfficiency = frameSize > aosOverhead ? (frameSize - aosOverhead) / frameSize : 1.0;
+                    const kbps = selectedRs * m * codingRate * aosEfficiency;
 
                     if (kbps > maxKbps) {
                         maxKbps = kbps;
@@ -1499,6 +1528,8 @@
             let codingRate = 1.0;
             if (coding.includes("Uncoded")) {
                 codingRate = 1.0;
+            } else if (coding.includes("LDPC")) {
+                codingRate = 7 / 8;
             } else if (coding.includes("Concat")) {
                 const match = coding.match(/Concat\s+(\d+)\/(\d+)/);
                 const inner = match ? (parseInt(match[1]) / parseInt(match[2])) : 0.5;
@@ -1508,7 +1539,10 @@
             }
 
             let ebN0Req = 0;
-            if (berData && ferData) {
+            if (coding.includes("LDPC")) {
+                // 7/8 LDPC not yet simulated - hardcoded required SNR for lossless decode
+                ebN0Req = 4.5;
+            } else if (berData && ferData) {
                 const colName = getCSVColumnName(coding, modulation);
                 const csvRows = targetType === "BER" ? berData : ferData;
                 const req = getRequiredEbN0(csvRows, colName, targetValue);
@@ -1540,9 +1574,15 @@
             }
 
             const bwHz = symRate * 1000 * (1 + rrcAlpha);
-            const usableKbps = symRate * m * codingRate;
+            // Raw information bit rate after FEC (used for Eb/N0 -> SNR conversion)
+            const infoKbps = symRate * m * codingRate;
+            // Usable payload rate after CCSDS AOS frame overhead
+            const frameSize = parseFloat(profile.frame_size) || DEFAULT_AOS_FRAME_SIZE;
+            const aosOverhead = parseFloat(profile.aos_overhead) || AOS_FRAME_OVERHEAD_BYTES;
+            const aosEfficiency = frameSize > aosOverhead ? (frameSize - aosOverhead) / frameSize : 1.0;
+            const usableKbps = infoKbps * aosEfficiency;
 
-            const reqSnrDb = ebN0Req === Infinity ? Infinity : ebN0Req + 10 * Math.log10((usableKbps * 1000) / bwHz);
+            const reqSnrDb = ebN0Req === Infinity ? Infinity : ebN0Req + 10 * Math.log10((infoKbps * 1000) / bwHz);
 
             const N_thermal = -173.98 + 10 * Math.log10(bwHz);
             const N_effective = N_thermal + rtlNf;
@@ -2030,6 +2070,8 @@
             document.getElementById('p_rtl_nf').value = prof.rtl_nf;
             document.getElementById('p_sym_rate').value = prof.sym_rate;
             document.getElementById('p_rrc_alpha').value = prof.rrc_alpha;
+            document.getElementById('p_frame_size').value = prof.frame_size !== undefined ? prof.frame_size : DEFAULT_AOS_FRAME_SIZE;
+            document.getElementById('p_aos_overhead').value = prof.aos_overhead !== undefined ? prof.aos_overhead : AOS_FRAME_OVERHEAD_BYTES;
             updateCodingSelectDropdown();
             document.getElementById('p_coding').value = prof.coding || "Concat 1/2 D4";
 
@@ -3197,6 +3239,8 @@
             bindProfileNum('p_rrc_alpha', 'rrc_alpha');
             bindProfileNum('p_impl_loss', 'impl_loss');
             bindProfileNum('p_phase_jitter', 'phase_jitter');
+            bindProfileNum('p_frame_size', 'frame_size');
+            bindProfileNum('p_aos_overhead', 'aos_overhead');
 
             document.getElementById('p_coding').addEventListener('change', (e) => {
                 onCodingChange();
