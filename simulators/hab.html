@@ -1196,8 +1196,15 @@
                     // Look up Eb/N0 Required
                     let ebN0Req = 0;
                     if (coding.includes("LDPC")) {
-                        // 7/8 LDPC not yet simulated - hardcoded required SNR for lossless decode
-                        ebN0Req = 4.5;
+                        // 7/8 LDPC not yet aff3ct-simulated - theoretical (idealized AWGN
+                        // decoder) Eb/No for near-error-free decode (~BER/FER 1e-5),
+                        // CCSDS 131.0-B-3 / GSFC-STD-9100 rate-7/8 code. NASA's own
+                        // published curves and vendor IP cores (Creonic, Comblock) agree
+                        // ~3.6-4.0 dB; cross-checked against a real decoded waterfall via
+                        // MER-to-Eb/No conversion (label - 3.01 dB QPSK - 0.58 dB rate
+                        // factor). impl_loss below (same field as every other coding)
+                        // covers the real-world decoder/RF-chain gap on top of this.
+                        ebN0Req = 3.9;
                     } else if (berData && ferData) {
                         const colName = getCSVColumnName(coding, modulation);
                         const csvRows = targetType === "BER" ? berData : ferData;
@@ -1540,8 +1547,15 @@
 
             let ebN0Req = 0;
             if (coding.includes("LDPC")) {
-                // 7/8 LDPC not yet simulated - hardcoded required SNR for lossless decode
-                ebN0Req = 4.5;
+                // 7/8 LDPC not yet aff3ct-simulated - theoretical (idealized AWGN
+                // decoder) Eb/No for near-error-free decode (~BER/FER 1e-5),
+                // CCSDS 131.0-B-3 / GSFC-STD-9100 rate-7/8 code. NASA's own
+                // published curves and vendor IP cores (Creonic, Comblock) agree
+                // ~3.6-4.0 dB; cross-checked against a real decoded waterfall via
+                // MER-to-Eb/No conversion (label - 3.01 dB QPSK - 0.58 dB rate
+                // factor). impl_loss below (same field as every other coding)
+                // covers the real-world decoder/RF-chain gap on top of this.
+                ebN0Req = 3.9;
             } else if (berData && ferData) {
                 const colName = getCSVColumnName(coding, modulation);
                 const csvRows = targetType === "BER" ? berData : ferData;
