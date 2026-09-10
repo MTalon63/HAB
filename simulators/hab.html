@@ -1195,25 +1195,19 @@
 
                     // Look up Eb/N0 Required
                     let ebN0Req = 0;
-                    if (coding.includes("LDPC")) {
-                        // 7/8 LDPC not yet aff3ct-simulated - theoretical (idealized AWGN
-                        // decoder) Eb/No for near-error-free decode (~BER/FER 1e-5),
-                        // CCSDS 131.0-B-3 / GSFC-STD-9100 rate-7/8 code. NASA's own
-                        // published curves and vendor IP cores (Creonic, Comblock) agree
-                        // ~3.6-4.0 dB; cross-checked against a real decoded waterfall via
-                        // MER-to-Eb/No conversion (label - 3.01 dB QPSK - 0.58 dB rate
-                        // factor). impl_loss below (same field as every other coding)
-                        // covers the real-world decoder/RF-chain gap on top of this.
-                        ebN0Req = 3.9;
-                    } else if (berData && ferData) {
+                    if (berData && ferData) {
                         const colName = getCSVColumnName(coding, modulation);
                         const csvRows = targetType === "BER" ? berData : ferData;
                         const req = getRequiredEbN0(csvRows, colName, targetValue);
                         if (req !== null) {
                             ebN0Req = req;
+                        } else if (coding.includes("LDPC")) {
+                            ebN0Req = 3.9; // fallback if outside CSV range
                         } else {
                             ebN0Req = Infinity;
                         }
+                    } else if (coding.includes("LDPC")) {
+                        ebN0Req = 3.9;
                     } else {
                         // Fallback
                         let viterbiRate = "1/2";
@@ -1546,25 +1540,19 @@
             }
 
             let ebN0Req = 0;
-            if (coding.includes("LDPC")) {
-                // 7/8 LDPC not yet aff3ct-simulated - theoretical (idealized AWGN
-                // decoder) Eb/No for near-error-free decode (~BER/FER 1e-5),
-                // CCSDS 131.0-B-3 / GSFC-STD-9100 rate-7/8 code. NASA's own
-                // published curves and vendor IP cores (Creonic, Comblock) agree
-                // ~3.6-4.0 dB; cross-checked against a real decoded waterfall via
-                // MER-to-Eb/No conversion (label - 3.01 dB QPSK - 0.58 dB rate
-                // factor). impl_loss below (same field as every other coding)
-                // covers the real-world decoder/RF-chain gap on top of this.
-                ebN0Req = 3.9;
-            } else if (berData && ferData) {
+            if (berData && ferData) {
                 const colName = getCSVColumnName(coding, modulation);
                 const csvRows = targetType === "BER" ? berData : ferData;
                 const req = getRequiredEbN0(csvRows, colName, targetValue);
                 if (req !== null) {
                     ebN0Req = req;
+                } else if (coding.includes("LDPC")) {
+                    ebN0Req = 3.9; // fallback if outside CSV range
                 } else {
                     ebN0Req = Infinity;
                 }
+            } else if (coding.includes("LDPC")) {
+                ebN0Req = 3.9;
             } else {
                 // Fallback to original model
                 let viterbiRate = "1/2";
